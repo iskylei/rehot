@@ -28,6 +28,8 @@ router.get('/stats', async (req, res) => {
       stats: {
         totalOrderAmount: formatAmount(stats.totalOrderAmount),
         todayOrderAmount: formatAmount(stats.todayOrderAmount),
+        todayPredictAmount: formatAmount(stats.todayPredictAmount),
+        todayRefundAmount: formatAmount(stats.todayRefundAmount),
         monthOrderAmount: formatAmount(stats.monthOrderAmount),
         totalRefundAmount: formatAmount(stats.totalRefundAmount),
         totalPredictAmount: formatAmount(stats.totalPredictAmount),
@@ -59,6 +61,8 @@ router.get('/org-stats', async (req, res) => {
       stats: {
         totalOrderAmount: formatAmount(stats.totalOrderAmount),
         todayOrderAmount: formatAmount(stats.todayOrderAmount),
+        todayPredictAmount: formatAmount(stats.todayPredictAmount),
+        todayRefundAmount: formatAmount(stats.todayRefundAmount),
         monthOrderAmount: formatAmount(stats.monthOrderAmount),
         totalRefundAmount: formatAmount(stats.totalRefundAmount),
         totalPredictAmount: formatAmount(stats.totalPredictAmount),

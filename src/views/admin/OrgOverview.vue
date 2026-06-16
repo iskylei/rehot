@@ -242,6 +242,8 @@ export default {
       stats: {
         totalOrderAmount: '0.00',
         todayOrderAmount: '0.00',
+        todayPredictAmount: '0.00',
+        todayRefundAmount: '0.00',
         monthOrderAmount: '0.00',
         totalRefundAmount: '0.00',
         totalPredictAmount: '0.00',
@@ -273,6 +275,8 @@ export default {
     periodStatCards() {
       return [
         { key: 'today', label: '当日支付总金额(元)', value: this.stats.todayOrderAmount, highlight: true },
+        { key: 'todayPredict', label: '当日预估佣金总额(元)', value: this.stats.todayPredictAmount },
+        { key: 'todayRefund', label: '当日退款金额(元)', value: this.stats.todayRefundAmount },
         { key: 'month', label: '本月累计金额(元)', value: this.stats.monthOrderAmount }
       ]
     }

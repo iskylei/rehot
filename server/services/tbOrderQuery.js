@@ -419,7 +419,10 @@ async function calcGlobalOverview(filters = {}) {
   `, globalParams)
 
   const selectedRow = await orderStore.queryOne(`
-    SELECT COALESCE(SUM(${orderAmount}), 0) AS today_order_amount
+    SELECT
+      COALESCE(SUM(${orderAmount}), 0) AS today_order_amount,
+      COALESCE(SUM(${predictAmount}), 0) AS today_predict_amount,
+      COALESCE(SUM(${refundAmount}), 0) AS today_refund_amount
     FROM ${table}
     ${selectedSql}
   `, selectedParams)
@@ -439,6 +442,8 @@ async function calcGlobalOverview(filters = {}) {
   return {
     totalOrderAmount: parseAmount(row?.total_order_amount),
     todayOrderAmount: parseAmount(selectedRow?.today_order_amount),
+    todayPredictAmount: parseAmount(selectedRow?.today_predict_amount),
+    todayRefundAmount: parseAmount(selectedRow?.today_refund_amount),
     monthOrderAmount: parseAmount(periodRow?.month_order_amount),
     totalRefundAmount: parseAmount(row?.total_refund_amount),
     totalPredictAmount: parseAmount(row?.total_predict_amount),

@@ -6,12 +6,13 @@
         <div class="admin-logo__cn">热浪管理程序</div>
       </div>
       <el-menu
+        :key="activeMenu"
         :default-active="activeMenu"
         :default-openeds="defaultOpeneds"
-        router
         background-color="#d4e8fc"
         text-color="#303133"
         active-text-color="#409EFF"
+        @select="handleMenuSelect"
       >
         <template v-for="menu in menus">
           <el-submenu v-if="menu.children && menu.children.length" :key="`group-${menu.id}`" :index="`group-${menu.id}`">
@@ -146,10 +147,16 @@ export default {
   },
   computed: {
     activeMenu() {
-      if (this.$route.path === '/admin/org-overview') {
-        return this.$route.fullPath
+      const { path, query } = this.$route
+      if (path === '/admin/org-overview') {
+        const org = String(query.org || '').trim()
+        if (org) {
+          const matched = this.findOrgMenuPath(org)
+          if (matched) return matched
+          return `/admin/org-overview?org=${org}`
+        }
       }
-      return this.$route.path
+      return path
     },
     menus() {
       const source = authState.menus.length ? authState.menus : getMenus()
@@ -186,6 +193,35 @@ export default {
     this.refreshSession()
   },
   methods: {
+    findOrgMenuPath(orgName) {
+      const target = String(orgName || '').trim()
+      if (!target) return ''
+
+      const walk = items => {
+        for (const menu of items) {
+          if (menu.children?.length) {
+            const matched = walk(menu.children)
+            if (matched) return matched
+            continue
+          }
+          const path = menu.path || ''
+          if (!path.startsWith('/admin/org-overview')) continue
+          const queryIndex = path.indexOf('?org=')
+          if (queryIndex === -1) continue
+          const menuOrg = decodeURIComponent(path.slice(queryIndex + 5))
+          if (menuOrg === target) return path
+        }
+        return ''
+      }
+
+      return walk(this.menus)
+    },
+    handleMenuSelect(index) {
+      if (!index || !index.startsWith('/admin/')) return
+      const target = normalizeAdminPath(index)
+      if (!target || target === this.activeMenu) return
+      this.$router.push(target).catch(() => {})
+    },
     async refreshSession() {
       try {
         const res = await fetchCurrentUser()
