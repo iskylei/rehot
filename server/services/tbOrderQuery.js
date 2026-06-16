@@ -2,9 +2,11 @@ const { parseAmount, parseRatio, getTodayRange, getMonthRange } = require('../ut
 const { formatDateString, getLast60DaysRange } = require('../utils/orderDate')
 const orderStore = require('./orderStore')
 
-function buildWhereClause(filters = {}) {
+function buildWhereClause(filters = {}, options = {}) {
+  const { excludeDateRange = false } = options
   const {
     loginUserName = '',
+    scopedLoginUserName = '',
     adUserNick = '',
     sellerNick = '',
     itemTitle = '',
@@ -16,7 +18,10 @@ function buildWhereClause(filters = {}) {
   let sql = 'WHERE 1=1'
   const params = []
 
-  if (loginUserName) {
+  if (scopedLoginUserName) {
+    sql += ' AND login_user_name = ?'
+    params.push(scopedLoginUserName)
+  } else if (loginUserName) {
     sql += ' AND login_user_name LIKE ?'
     params.push(`%${loginUserName}%`)
   }
@@ -36,13 +41,15 @@ function buildWhereClause(filters = {}) {
     sql += ' AND order_status = ?'
     params.push(orderStatus)
   }
-  if (startDate) {
-    sql += ' AND order_paid_time >= ?'
-    params.push(startDate)
-  }
-  if (endDate) {
-    sql += ' AND order_paid_time <= ?'
-    params.push(endDate.includes(':') ? endDate : `${endDate} 23:59:59`)
+  if (!excludeDateRange) {
+    if (startDate) {
+      sql += ' AND order_paid_time >= ?'
+      params.push(startDate)
+    }
+    if (endDate) {
+      sql += ' AND order_paid_time <= ?'
+      params.push(endDate.includes(':') ? endDate : `${endDate} 23:59:59`)
+    }
   }
 
   return { sql, params }
@@ -377,6 +384,7 @@ async function calcGlobalOverview(filters = {}) {
   const { start: todayStart, end: todayEnd } = getTodayRange()
   const { start: monthStart, end: monthEnd } = getMonthRange()
   const { sql, params } = buildWhereClause(filters)
+  const { sql: periodSql, params: periodParams } = buildWhereClause(filters, { excludeDateRange: true })
 
   const row = await orderStore.queryOne(`
     SELECT
@@ -384,7 +392,13 @@ async function calcGlobalOverview(filters = {}) {
       COALESCE(SUM(${refundAmount}), 0) AS total_refund_amount,
       COALESCE(SUM(${predictAmount}), 0) AS total_predict_amount,
       AVG(${avgRatio}) AS avg_commission_ratio,
-      MAX(order_paid_time) AS latest_paid_time,
+      MAX(order_paid_time) AS latest_paid_time
+    FROM ${table}
+    ${sql}
+  `, params)
+
+  const periodRow = await orderStore.queryOne(`
+    SELECT
       COALESCE(SUM(CASE
         WHEN order_paid_time >= ? AND order_paid_time <= ?
         THEN ${orderAmount}
@@ -396,14 +410,14 @@ async function calcGlobalOverview(filters = {}) {
         ELSE 0
       END), 0) AS month_order_amount
     FROM ${table}
-    ${sql}
-  `, [...params, todayStart, todayEnd, monthStart, monthEnd])
+    ${periodSql}
+  `, [...periodParams, todayStart, todayEnd, monthStart, monthEnd])
 
   const avgCommissionRatio = row?.avg_commission_ratio
   return {
     totalOrderAmount: parseAmount(row?.total_order_amount),
-    todayOrderAmount: parseAmount(row?.today_order_amount),
-    monthOrderAmount: parseAmount(row?.month_order_amount),
+    todayOrderAmount: parseAmount(periodRow?.today_order_amount),
+    monthOrderAmount: parseAmount(periodRow?.month_order_amount),
     totalRefundAmount: parseAmount(row?.total_refund_amount),
     totalPredictAmount: parseAmount(row?.total_predict_amount),
     avgCommissionRatio: avgCommissionRatio === null || avgCommissionRatio === undefined

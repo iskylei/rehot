@@ -67,7 +67,10 @@
           <el-input v-model="form.title" placeholder="请输入菜单名称" />
         </el-form-item>
         <el-form-item label="路由路径">
-          <el-input v-model="form.path" placeholder="如 /admin/users，目录可留空" />
+          <el-input
+            v-model="form.path"
+            placeholder="如 /admin/users；机构页：/admin/org-overview?org=联奇文化"
+          />
         </el-form-item>
         <el-form-item label="图标">
           <el-input v-model="form.icon" placeholder="如 el-icon-user" />

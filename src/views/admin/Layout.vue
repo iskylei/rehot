@@ -9,7 +9,7 @@
         :default-active="activeMenu"
         :default-openeds="defaultOpeneds"
         router
-        background-color="#ecf5ff"
+        background-color="#d4e8fc"
         text-color="#303133"
         active-text-color="#409EFF"
       >
@@ -146,6 +146,9 @@ export default {
   },
   computed: {
     activeMenu() {
+      if (this.$route.path === '/admin/org-overview') {
+        return this.$route.fullPath
+      }
       return this.$route.path
     },
     menus() {
@@ -236,14 +239,14 @@ export default {
 }
 
 .admin-aside {
-  background: #ecf5ff;
-  border-right: 1px solid #d9ecff;
+  background: #d4e8fc;
+  border-right: 1px solid #b8d9f8;
 }
 
 .admin-logo {
   color: #303133;
   padding: 20px 16px;
-  border-bottom: 1px solid #d9ecff;
+  border-bottom: 1px solid #b8d9f8;
 }
 
 .admin-logo__en {

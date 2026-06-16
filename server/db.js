@@ -303,6 +303,35 @@ function seedTbOrderMenu() {
   })
 }
 
+function migrateOrgOverviewMenus() {
+  db.prepare(`
+    UPDATE menus
+    SET title = '联奇文化数据',
+        path = '/admin/org-overview?org=联奇文化',
+        icon = 'el-icon-data-line',
+        permission_code = 'tb_order:view',
+        sort_order = 3,
+        enabled = 1
+    WHERE path = '/admin/dev-lianqi-overview'
+  `).run()
+
+  const existing = db.prepare("SELECT id FROM menus WHERE path = '/admin/org-overview?org=联奇文化'").get()
+  if (existing) return
+
+  const legacy = db.prepare("SELECT id FROM menus WHERE path = '/admin/dev-lianqi-overview'").get()
+  if (legacy) return
+
+  const business = db.prepare(`
+    SELECT id FROM menus WHERE title = '业务管理' AND parent_id = 0 LIMIT 1
+  `).get()
+  if (!business) return
+
+  db.prepare(`
+    INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
+    VALUES (?, '联奇文化数据', '/admin/org-overview?org=联奇文化', 'el-icon-data-line', 'tb_order:view', 3, 1)
+  `).run(business.id)
+}
+
 function seedLoginConfigMenu() {
   const existing = db.prepare("SELECT id FROM menus WHERE path = '/admin/login-config'").get()
   if (existing) return
@@ -554,6 +583,7 @@ function initDb() {
   seedRoles()
   seedMenus()
   seedTbOrderMenu()
+  migrateOrgOverviewMenus()
   seedLoginConfigMenu()
   seedUsers()
   seedDemoTbOrders()

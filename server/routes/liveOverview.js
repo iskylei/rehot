@@ -14,6 +14,7 @@ const {
 } = require('../services/tbOrderQuery')
 const { buildLiveOverviewExcelBuffer } = require('../services/liveOverviewExport')
 const { formatAmount, formatRatio } = require('../utils/amount')
+const { resolveOrderFilters } = require('../utils/orderFilters')
 
 const router = express.Router()
 
@@ -39,31 +40,44 @@ router.get('/stats', async (req, res) => {
   }
 })
 
+router.get('/org-stats', async (req, res) => {
+  try {
+    const { orgName = '', startDate = '', endDate = '' } = req.query
+    const scopedLoginUserName = String(orgName).trim()
+
+    if (!scopedLoginUserName) {
+      return res.status(400).json({ message: '请指定机构名称' })
+    }
+
+    const stats = await calcGlobalOverview({
+      startDate,
+      endDate,
+      scopedLoginUserName
+    })
+    res.json({
+      orgName: scopedLoginUserName,
+      stats: {
+        totalOrderAmount: formatAmount(stats.totalOrderAmount),
+        todayOrderAmount: formatAmount(stats.todayOrderAmount),
+        monthOrderAmount: formatAmount(stats.monthOrderAmount),
+        totalRefundAmount: formatAmount(stats.totalRefundAmount),
+        totalPredictAmount: formatAmount(stats.totalPredictAmount),
+        avgCommissionRatio: formatRatio(stats.avgCommissionRatio),
+        latestPaidTime: stats.latestPaidTime || '-'
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
 router.get('/order-statuses', (req, res) => {
   res.json({ items: ORDER_STATUS_OPTIONS })
 })
 
 router.get('/product-chart', async (req, res) => {
   try {
-    const {
-      loginUserName = '',
-      adUserNick = '',
-      sellerNick = '',
-      itemTitle = '',
-      orderStatus = '',
-      startDate = '',
-      endDate = ''
-    } = req.query
-
-    const items = (await calcProductChartStats({
-      loginUserName,
-      adUserNick,
-      sellerNick,
-      itemTitle,
-      orderStatus,
-      startDate,
-      endDate
-    })).map(item => ({
+    const items = (await calcProductChartStats(resolveOrderFilters(req.query))).map(item => ({
       paidDate: item.paidDate,
       itemTitle: item.itemTitle,
       orderCount: item.orderCount,
@@ -78,25 +92,7 @@ router.get('/product-chart', async (req, res) => {
 
 router.get('/product-commission-chart', async (req, res) => {
   try {
-    const {
-      loginUserName = '',
-      adUserNick = '',
-      sellerNick = '',
-      itemTitle = '',
-      orderStatus = '',
-      startDate = '',
-      endDate = ''
-    } = req.query
-
-    const result = await calcProductCommissionStats({
-      loginUserName,
-      adUserNick,
-      sellerNick,
-      itemTitle,
-      orderStatus,
-      startDate,
-      endDate
-    })
+    const result = await calcProductCommissionStats(resolveOrderFilters(req.query))
 
     res.json({
       startDate: result.startDate,
@@ -115,25 +111,7 @@ router.get('/product-commission-chart', async (req, res) => {
 
 router.get('/ad-user-amount-chart', async (req, res) => {
   try {
-    const {
-      loginUserName = '',
-      adUserNick = '',
-      sellerNick = '',
-      itemTitle = '',
-      orderStatus = '',
-      startDate = '',
-      endDate = ''
-    } = req.query
-
-    const result = await calcAdUserAmountStats({
-      loginUserName,
-      adUserNick,
-      sellerNick,
-      itemTitle,
-      orderStatus,
-      startDate,
-      endDate
-    })
+    const result = await calcAdUserAmountStats(resolveOrderFilters(req.query))
 
     res.json({
       startDate: result.startDate,
@@ -153,25 +131,7 @@ router.get('/ad-user-amount-chart', async (req, res) => {
 
 router.get('/seller-amount-chart', async (req, res) => {
   try {
-    const {
-      loginUserName = '',
-      adUserNick = '',
-      sellerNick = '',
-      itemTitle = '',
-      orderStatus = '',
-      startDate = '',
-      endDate = ''
-    } = req.query
-
-    const result = await calcSellerAmountStats({
-      loginUserName,
-      adUserNick,
-      sellerNick,
-      itemTitle,
-      orderStatus,
-      startDate,
-      endDate
-    })
+    const result = await calcSellerAmountStats(resolveOrderFilters(req.query))
 
     res.json({
       startDate: result.startDate,
@@ -191,25 +151,7 @@ router.get('/seller-amount-chart', async (req, res) => {
 
 router.get('/hourly-amount-chart', async (req, res) => {
   try {
-    const {
-      loginUserName = '',
-      adUserNick = '',
-      sellerNick = '',
-      itemTitle = '',
-      orderStatus = '',
-      startDate = '',
-      endDate = ''
-    } = req.query
-
-    const result = await calcHourlyAmountStats({
-      loginUserName,
-      adUserNick,
-      sellerNick,
-      itemTitle,
-      orderStatus,
-      startDate,
-      endDate
-    })
+    const result = await calcHourlyAmountStats(resolveOrderFilters(req.query))
 
     res.json({
       startDate: result.startDate,
@@ -230,21 +172,7 @@ router.get('/hourly-amount-chart', async (req, res) => {
 
 router.get('/daily-amount-chart', async (req, res) => {
   try {
-    const {
-      loginUserName = '',
-      adUserNick = '',
-      sellerNick = '',
-      itemTitle = '',
-      orderStatus = ''
-    } = req.query
-
-    const result = await calcDailyAmountStats({
-      loginUserName,
-      adUserNick,
-      sellerNick,
-      itemTitle,
-      orderStatus
-    })
+    const result = await calcDailyAmountStats(resolveOrderFilters(req.query))
 
     res.json({
       startDate: result.startDate,
@@ -289,29 +217,51 @@ router.get('/export', async (req, res) => {
   }
 })
 
+router.get('/org-export', async (req, res) => {
+  try {
+    const { orgName = '', startDate = '', endDate = '' } = req.query
+    const scopedLoginUserName = String(orgName).trim()
+
+    if (!scopedLoginUserName) {
+      return res.status(400).json({ message: '请指定机构名称' })
+    }
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: '请选择支付日期范围后再导出' })
+    }
+
+    const { buffer, rowCount, filename } = await buildLiveOverviewExcelBuffer({
+      startDate,
+      endDate,
+      scopedLoginUserName
+    })
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
+    )
+    res.setHeader('X-Export-Row-Count', String(rowCount))
+    res.send(buffer)
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
 router.get('/orders', async (req, res) => {
   try {
     const {
-      loginUserName = '',
-      adUserNick = '',
-      sellerNick = '',
-      itemTitle = '',
-      orderStatus = '',
-      startDate = '',
-      endDate = '',
       page = '1',
       pageSize = '20'
     } = req.query
 
-    const { rows, total, page: pageNum, pageSize: sizeNum } = await fetchRowsPaged({
-      loginUserName,
-      adUserNick,
-      sellerNick,
-      itemTitle,
-      orderStatus,
-      startDate,
-      endDate
-    }, page, pageSize)
+    const { rows, total, page: pageNum, pageSize: sizeNum } = await fetchRowsPaged(
+      resolveOrderFilters(req.query),
+      page,
+      pageSize
+    )
 
     res.json({
       items: rows.map(mapSysTbOrder),

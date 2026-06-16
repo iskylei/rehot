@@ -45,6 +45,12 @@ const routes = [
         meta: { requiresAuth: true, title: '直播数据总览', permission: 'tb_order:view' }
       },
       {
+        path: 'org-overview',
+        name: 'OrgOverview',
+        component: () => import('../views/admin/OrgOverview.vue'),
+        meta: { requiresAuth: true, title: '机构数据总览', permission: 'tb_order:view' }
+      },
+      {
         path: 'tb-orders',
         name: 'TbOrderList',
         component: () => import('../views/admin/TbOrderList.vue'),

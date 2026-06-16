@@ -6,6 +6,10 @@ export function fetchLiveOverviewStats(params) {
   return request.get('/live-overview/stats', { params })
 }
 
+export function fetchOrgLiveOverviewStats(params) {
+  return request.get('/live-overview/org-stats', { params })
+}
+
 export function fetchOrderStatuses() {
   return request.get('/live-overview/order-statuses')
 }
@@ -50,9 +54,9 @@ function parseExportFilename(contentDisposition, fallbackName) {
   return plainMatch?.[1] || fallbackName
 }
 
-export async function downloadLiveOverviewExport(params) {
+async function downloadExport(url, params, fallbackName) {
   try {
-    const response = await axios.get('/api/live-overview/export', {
+    const response = await axios.get(url, {
       params,
       responseType: 'blob',
       timeout: 300000,
@@ -67,10 +71,6 @@ export async function downloadLiveOverviewExport(params) {
       const payload = JSON.parse(text)
       throw new Error(payload.message || '导出失败')
     }
-
-    const fallbackName = params.startDate === params.endDate
-      ? `直播订单_${params.startDate}.xlsx`
-      : `直播订单_${params.startDate}_${params.endDate}.xlsx`
 
     return {
       blob: response.data,
@@ -89,4 +89,21 @@ export async function downloadLiveOverviewExport(params) {
     }
     throw new Error(error.message || '导出失败')
   }
+}
+
+export async function downloadLiveOverviewExport(params) {
+  const fallbackName = params.startDate === params.endDate
+    ? `直播订单_${params.startDate}.xlsx`
+    : `直播订单_${params.startDate}_${params.endDate}.xlsx`
+
+  return downloadExport('/api/live-overview/export', params, fallbackName)
+}
+
+export async function downloadOrgLiveOverviewExport(params) {
+  const orgLabel = params.orgName ? `${params.orgName}_` : ''
+  const fallbackName = params.startDate === params.endDate
+    ? `直播订单_${orgLabel}${params.startDate}.xlsx`
+    : `直播订单_${orgLabel}${params.startDate}_${params.endDate}.xlsx`
+
+  return downloadExport('/api/live-overview/org-export', params, fallbackName)
 }

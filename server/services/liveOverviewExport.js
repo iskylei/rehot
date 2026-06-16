@@ -50,9 +50,10 @@ function buildExportRows(rows) {
   return rows.map(row => EXPORT_COLUMNS.map(column => formatExportCell(row[column])))
 }
 
-function buildExportFilename(startDate, endDate) {
+function buildExportFilename(startDate, endDate, orgName = '') {
   const rangeLabel = startDate === endDate ? startDate : `${startDate}_${endDate}`
-  return `直播订单_${rangeLabel}.xlsx`
+  const orgLabel = orgName ? `${orgName}_` : ''
+  return `直播订单_${orgLabel}${rangeLabel}.xlsx`
 }
 
 async function buildLiveOverviewWorkbook(filters = {}) {
@@ -64,7 +65,11 @@ async function buildLiveOverviewWorkbook(filters = {}) {
   return {
     workbook,
     rowCount: rows.length,
-    filename: buildExportFilename(filters.startDate, filters.endDate)
+    filename: buildExportFilename(
+      filters.startDate,
+      filters.endDate,
+      filters.scopedLoginUserName || ''
+    )
   }
 }
 

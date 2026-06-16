@@ -244,6 +244,36 @@ async function seedTbOrderMenu() {
   }
 }
 
+async function migrateOrgOverviewMenus() {
+  await appStore.execute(`
+    UPDATE menus
+    SET title = '联奇文化数据',
+        path = '/admin/org-overview?org=联奇文化',
+        icon = 'el-icon-data-line',
+        permission_code = 'tb_order:view',
+        sort_order = 3,
+        enabled = 1
+    WHERE path = '/admin/dev-lianqi-overview'
+  `)
+
+  const existing = await appStore.queryOne("SELECT id FROM menus WHERE path = '/admin/org-overview?org=联奇文化'")
+  if (existing) return
+
+  const legacy = await appStore.queryOne("SELECT id FROM menus WHERE path = '/admin/dev-lianqi-overview'")
+  if (legacy) return
+
+  const business = await appStore.queryOne(`
+    SELECT id FROM menus WHERE title = '业务管理' AND parent_id = 0 LIMIT 1
+  `)
+  if (!business) return
+
+  await appStore.execute(
+    `INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
+     VALUES (?, '联奇文化数据', '/admin/org-overview?org=联奇文化', 'el-icon-data-line', 'tb_order:view', 3, 1)`,
+    [business.id]
+  )
+}
+
 async function seedLoginConfigMenu() {
   const existing = await appStore.queryOne("SELECT id FROM menus WHERE path = '/admin/login-config'")
   if (existing) return
@@ -327,6 +357,7 @@ async function seedMysqlApp() {
   await seedRoles()
   await seedMenus()
   await seedTbOrderMenu()
+  await migrateOrgOverviewMenus()
   await seedLoginConfigMenu()
   await seedUsers()
   await seedHeatWaves()
