@@ -411,7 +411,7 @@ async function calcGlobalOverview(filters = {}) {
       END), 0) AS month_order_amount
     FROM ${table}
     ${periodSql}
-  `, [...periodParams, todayStart, todayEnd, monthStart, monthEnd])
+  `, [todayStart, todayEnd, monthStart, monthEnd, ...periodParams])
 
   const avgCommissionRatio = row?.avg_commission_ratio
   return {

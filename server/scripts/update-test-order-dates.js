@@ -12,7 +12,7 @@ async function updateTestOrderPaidDates() {
   const rows = await orderStore.queryAll(`
     SELECT id, order_paid_time
     FROM ${table}
-    WHERE login_user_name = '柳风文化' OR biz_order_id LIKE 'DEMO-%'
+    WHERE login_user_name = '柳风文化' OR biz_order_id LIKE 'DEMO-%' OR biz_order_id LIKE 'ORGSEED-%'
   `)
 
   for (const row of rows) {

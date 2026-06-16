@@ -7,6 +7,7 @@ const fs = require('fs')
 const { getDatabaseConfig, usesMysqlOrders, usesMysqlApp, usesSqliteApp, getOrdersDatabaseName } = require('./config/database')
 const { initMysqlPools, pingMysql } = require('./db/mysql')
 const { seedMysqlApp } = require('./db/mysqlSeed')
+const { seedOrgOrders } = require('./seeds/orgOrdersSeed')
 
 const authRoutes = require('./routes/auth')
 const heatWaveRoutes = require('./routes/heatWaves')
@@ -127,6 +128,15 @@ async function startServer() {
 
   if (usesMysqlApp()) {
     await seedMysqlApp()
+  }
+
+  try {
+    const orgSeedResult = await seedOrgOrders()
+    if (!orgSeedResult.skipped) {
+      console.log(orgSeedResult.message)
+    }
+  } catch (error) {
+    console.warn('机构测试订单初始化跳过:', error.message)
   }
 
   console.log(`Database driver: ${dbConfig.driver}`)

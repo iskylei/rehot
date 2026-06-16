@@ -304,6 +304,13 @@ function seedTbOrderMenu() {
 }
 
 function migrateOrgOverviewMenus() {
+  const orgMenus = [
+    { title: '联奇文化数据', org: '联奇文化', sortOrder: 3 },
+    { title: '柳风文化数据', org: '柳风文化', sortOrder: 4 },
+    { title: '星火机构数据', org: '星火机构', sortOrder: 5 },
+    { title: '蓝海机构数据', org: '蓝海机构', sortOrder: 6 }
+  ]
+
   db.prepare(`
     UPDATE menus
     SET title = '联奇文化数据',
@@ -315,21 +322,29 @@ function migrateOrgOverviewMenus() {
     WHERE path = '/admin/dev-lianqi-overview'
   `).run()
 
-  const existing = db.prepare("SELECT id FROM menus WHERE path = '/admin/org-overview?org=联奇文化'").get()
-  if (existing) return
-
-  const legacy = db.prepare("SELECT id FROM menus WHERE path = '/admin/dev-lianqi-overview'").get()
-  if (legacy) return
-
   const business = db.prepare(`
     SELECT id FROM menus WHERE title = '业务管理' AND parent_id = 0 LIMIT 1
   `).get()
   if (!business) return
 
-  db.prepare(`
-    INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
-    VALUES (?, '联奇文化数据', '/admin/org-overview?org=联奇文化', 'el-icon-data-line', 'tb_order:view', 3, 1)
-  `).run(business.id)
+  orgMenus.forEach(menu => {
+    const path = `/admin/org-overview?org=${menu.org}`
+    const existing = db.prepare('SELECT id FROM menus WHERE path = ?').get(path)
+    if (existing) {
+      db.prepare(`
+        UPDATE menus
+        SET title = ?, icon = 'el-icon-data-line', permission_code = 'tb_order:view',
+            sort_order = ?, enabled = 1
+        WHERE path = ?
+      `).run(menu.title, menu.sortOrder, path)
+      return
+    }
+
+    db.prepare(`
+      INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
+      VALUES (?, ?, ?, 'el-icon-data-line', 'tb_order:view', ?, 1)
+    `).run(business.id, menu.title, path, menu.sortOrder)
+  })
 }
 
 function seedLoginConfigMenu() {

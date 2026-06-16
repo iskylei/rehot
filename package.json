@@ -14,6 +14,8 @@
     "start": "NODE_ENV=production node server/index.js",
     "seed:orders": "node server/scripts/seed-liufeng-orders.js",
     "seed:orders:force": "node server/scripts/seed-liufeng-orders.js --force",
+    "seed:orgs": "node server/scripts/seed-org-orders.js",
+    "seed:orgs:force": "node server/scripts/seed-org-orders.js --force",
     "seed:orders:today": "node server/scripts/update-test-order-dates.js",
     "db:init:mysql": "node server/scripts/init-mysql.js",
     "db:init:mysql:app": "node server/scripts/init-mysql.js --app-only",

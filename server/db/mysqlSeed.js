@@ -245,6 +245,13 @@ async function seedTbOrderMenu() {
 }
 
 async function migrateOrgOverviewMenus() {
+  const orgMenus = [
+    { title: '联奇文化数据', org: '联奇文化', sortOrder: 3 },
+    { title: '柳风文化数据', org: '柳风文化', sortOrder: 4 },
+    { title: '星火机构数据', org: '星火机构', sortOrder: 5 },
+    { title: '蓝海机构数据', org: '蓝海机构', sortOrder: 6 }
+  ]
+
   await appStore.execute(`
     UPDATE menus
     SET title = '联奇文化数据',
@@ -256,22 +263,30 @@ async function migrateOrgOverviewMenus() {
     WHERE path = '/admin/dev-lianqi-overview'
   `)
 
-  const existing = await appStore.queryOne("SELECT id FROM menus WHERE path = '/admin/org-overview?org=联奇文化'")
-  if (existing) return
-
-  const legacy = await appStore.queryOne("SELECT id FROM menus WHERE path = '/admin/dev-lianqi-overview'")
-  if (legacy) return
-
   const business = await appStore.queryOne(`
     SELECT id FROM menus WHERE title = '业务管理' AND parent_id = 0 LIMIT 1
   `)
   if (!business) return
 
-  await appStore.execute(
-    `INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
-     VALUES (?, '联奇文化数据', '/admin/org-overview?org=联奇文化', 'el-icon-data-line', 'tb_order:view', 3, 1)`,
-    [business.id]
-  )
+  for (const menu of orgMenus) {
+    const path = `/admin/org-overview?org=${menu.org}`
+    const existing = await appStore.queryOne('SELECT id FROM menus WHERE path = ?', [path])
+    if (existing) {
+      await appStore.execute(`
+        UPDATE menus
+        SET title = ?, icon = 'el-icon-data-line', permission_code = 'tb_order:view',
+            sort_order = ?, enabled = 1
+        WHERE path = ?
+      `, [menu.title, menu.sortOrder, path])
+      continue
+    }
+
+    await appStore.execute(
+      `INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
+       VALUES (?, ?, ?, 'el-icon-data-line', 'tb_order:view', ?, 1)`,
+      [business.id, menu.title, path, menu.sortOrder]
+    )
+  }
 }
 
 async function seedLoginConfigMenu() {

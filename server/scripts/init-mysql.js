@@ -71,6 +71,14 @@ async function initMysql() {
     }
     if (target === 'all' || target === 'orders') {
       await runMigrationFile(connection, MIGRATION_FILES.orders)
+      const { initMysqlPools } = require('../db/mysql')
+      const { seedOrgOrders } = require('../seeds/orgOrdersSeed')
+      await initMysqlPools()
+      const result = await seedOrgOrders()
+      console.log(result.message)
+      if (result.organizations?.length) {
+        console.log(`机构列表：${result.organizations.join('、')}`)
+      }
     }
     console.log('MySQL 建表完成')
   } finally {
