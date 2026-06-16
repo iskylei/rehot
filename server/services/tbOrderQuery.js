@@ -375,16 +375,37 @@ async function calcProductChartStats(filters = {}) {
   }))
 }
 
+function resolveSelectedDateRange(filters = {}) {
+  const { startDate = '', endDate = '' } = filters
+  if (startDate && endDate) {
+    return {
+      start: startDate,
+      end: endDate.includes(':') ? endDate : `${endDate} 23:59:59`
+    }
+  }
+  return getTodayRange()
+}
+
 async function calcGlobalOverview(filters = {}) {
   const table = orderStore.getOrdersTableRef()
   const orderAmount = orderStore.amountExpr('order_amount')
   const refundAmount = orderStore.amountExpr('refund_amount')
   const predictAmount = orderStore.amountExpr('predict_amount')
   const avgRatio = orderStore.validRatioExpr('seller_commission_ratio')
-  const { start: todayStart, end: todayEnd } = getTodayRange()
   const { start: monthStart, end: monthEnd } = getMonthRange()
-  const { sql, params } = buildWhereClause(filters)
-  const { sql: periodSql, params: periodParams } = buildWhereClause(filters, { excludeDateRange: true })
+  const { start: selectedStart, end: selectedEnd } = resolveSelectedDateRange(filters)
+
+  const globalFilters = {}
+  if (filters.scopedLoginUserName) {
+    globalFilters.scopedLoginUserName = filters.scopedLoginUserName
+  }
+  const { sql: globalSql, params: globalParams } = buildWhereClause(globalFilters, { excludeDateRange: true })
+  const { sql: periodSql, params: periodParams } = buildWhereClause(globalFilters, { excludeDateRange: true })
+  const { sql: selectedSql, params: selectedParams } = buildWhereClause({
+    ...globalFilters,
+    startDate: selectedStart,
+    endDate: selectedEnd
+  })
 
   const row = await orderStore.queryOne(`
     SELECT
@@ -394,8 +415,14 @@ async function calcGlobalOverview(filters = {}) {
       AVG(${avgRatio}) AS avg_commission_ratio,
       MAX(order_paid_time) AS latest_paid_time
     FROM ${table}
-    ${sql}
-  `, params)
+    ${globalSql}
+  `, globalParams)
+
+  const selectedRow = await orderStore.queryOne(`
+    SELECT COALESCE(SUM(${orderAmount}), 0) AS today_order_amount
+    FROM ${table}
+    ${selectedSql}
+  `, selectedParams)
 
   const periodRow = await orderStore.queryOne(`
     SELECT
@@ -403,20 +430,15 @@ async function calcGlobalOverview(filters = {}) {
         WHEN order_paid_time >= ? AND order_paid_time <= ?
         THEN ${orderAmount}
         ELSE 0
-      END), 0) AS today_order_amount,
-      COALESCE(SUM(CASE
-        WHEN order_paid_time >= ? AND order_paid_time <= ?
-        THEN ${orderAmount}
-        ELSE 0
       END), 0) AS month_order_amount
     FROM ${table}
     ${periodSql}
-  `, [todayStart, todayEnd, monthStart, monthEnd, ...periodParams])
+  `, [monthStart, monthEnd, ...periodParams])
 
   const avgCommissionRatio = row?.avg_commission_ratio
   return {
     totalOrderAmount: parseAmount(row?.total_order_amount),
-    todayOrderAmount: parseAmount(periodRow?.today_order_amount),
+    todayOrderAmount: parseAmount(selectedRow?.today_order_amount),
     monthOrderAmount: parseAmount(periodRow?.month_order_amount),
     totalRefundAmount: parseAmount(row?.total_refund_amount),
     totalPredictAmount: parseAmount(row?.total_predict_amount),

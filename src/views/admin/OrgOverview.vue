@@ -12,6 +12,19 @@
         <div class="page-intro-desc">仅统计机构名称为「{{ orgName }}」的订单数据</div>
       </el-card>
 
+      <el-row v-loading="statsLoading" :gutter="12" class="stats-row stats-row--global" type="flex">
+        <el-col
+          v-for="item in globalStatCards"
+          :key="item.key"
+          class="stat-col-global"
+        >
+          <el-card shadow="hover" class="stat-card">
+            <div class="stat-label">{{ item.label }}</div>
+            <div class="stat-value" :class="{ highlight: item.highlight }">{{ item.value }}</div>
+          </el-card>
+        </el-col>
+      </el-row>
+
       <el-card shadow="never" class="stats-filter-card">
         <el-form :inline="true" size="small" @submit.native.prevent>
           <el-form-item label="支付日期">
@@ -39,8 +52,8 @@
         </el-form>
       </el-card>
 
-      <el-row v-loading="statsLoading" :gutter="16" class="stats-row">
-        <el-col :span="6" v-for="item in statCards" :key="item.key">
+      <el-row :gutter="16" class="stats-row stats-row--period">
+        <el-col :span="6" v-for="item in periodStatCards" :key="item.key">
           <el-card shadow="hover" class="stat-card">
             <div class="stat-label">{{ item.label }}</div>
             <div class="stat-value" :class="{ highlight: item.highlight }">{{ item.value }}</div>
@@ -248,15 +261,19 @@ export default {
     orgName() {
       return String(this.$route.query.org || '').trim()
     },
-    statCards() {
+    globalStatCards() {
       return [
         { key: 'total', label: '订单支付总金额(元)', value: this.stats.totalOrderAmount },
-        { key: 'today', label: '当日支付总金额(元)', value: this.stats.todayOrderAmount, highlight: true },
-        { key: 'month', label: '本月累计金额(元)', value: this.stats.monthOrderAmount },
-        { key: 'refund', label: '退款金额(元)', value: this.stats.totalRefundAmount },
         { key: 'predict', label: '预估佣金总额(元)', value: this.stats.totalPredictAmount },
         { key: 'ratio', label: '佣金比例平均值', value: this.stats.avgCommissionRatio },
+        { key: 'refund', label: '退款金额(元)', value: this.stats.totalRefundAmount },
         { key: 'latest', label: '直播实时时间', value: this.stats.latestPaidTime, highlight: true }
+      ]
+    },
+    periodStatCards() {
+      return [
+        { key: 'today', label: '当日支付总金额(元)', value: this.stats.todayOrderAmount, highlight: true },
+        { key: 'month', label: '本月累计金额(元)', value: this.stats.monthOrderAmount }
       ]
     }
   },
@@ -437,6 +454,27 @@ export default {
 
 .stats-filter-card ::v-deep .el-card__body {
   padding-bottom: 2px;
+}
+
+.stats-row--global {
+  flex-wrap: nowrap;
+}
+
+.stats-row--global .stat-col-global {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-row--global .stat-card {
+  min-height: 84px;
+}
+
+.stats-row--global .stat-label {
+  font-size: 12px;
+}
+
+.stats-row--global .stat-value {
+  font-size: 20px;
 }
 
 .stat-card {
