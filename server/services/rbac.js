@@ -1,4 +1,5 @@
 const appStore = require('./appStore')
+const { isOrgPermissionCode } = require('../constants/orgPermissions')
 
 async function getUserWithRole(userId) {
   return appStore.queryOne(`
@@ -81,6 +82,15 @@ function buildMenuTree(items) {
   return roots
 }
 
+function canViewMenu(menu, permissionSet) {
+  if (!menu.permissionCode) return true
+  if (permissionSet.has(menu.permissionCode)) return true
+  if (isOrgPermissionCode(menu.permissionCode) && permissionSet.has('tb_order:view')) {
+    return true
+  }
+  return false
+}
+
 async function getAccessibleMenus(userId) {
   const permissions = await getUserPermissions(userId)
   const permissionSet = new Set(permissions)
@@ -92,10 +102,7 @@ async function getAccessibleMenus(userId) {
   `)
 
   const allMenus = rows.map(mapMenu)
-  const allowed = allMenus.filter(menu => {
-    if (!menu.permissionCode) return true
-    return permissionSet.has(menu.permissionCode)
-  })
+  const allowed = allMenus.filter(menu => canViewMenu(menu, permissionSet))
   const allowedIds = new Set(allowed.map(menu => menu.id))
 
   const includeAncestors = new Set(allowedIds)

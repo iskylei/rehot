@@ -1,3 +1,8 @@
+import {
+  canAccessOrgData,
+  canViewMenuPermission
+} from '@/constants/orgPermissions'
+
 export const VALID_ADMIN_PATHS = [
   '/admin/live-overview',
   '/admin/org-overview',
@@ -42,12 +47,7 @@ export function getAdminPathname(path) {
 }
 
 export function findFirstMenuPath(menus = [], permissions = []) {
-  const permissionSet = new Set(permissions)
-
-  const canAccess = menu => {
-    if (!menu.permissionCode) return true
-    return permissionSet.has(menu.permissionCode)
-  }
+  const canAccess = menu => canViewMenuPermission(menu.permissionCode, permissions)
 
   for (const menu of menus) {
     const normalized = normalizeAdminPath(menu.path)
@@ -67,7 +67,6 @@ export function canAccessPath(path, menus = [], permissions = []) {
   const normalized = normalizeAdminPath(path)
   if (!normalized) return false
 
-  const permissionSet = new Set(permissions)
   const requestPathname = getAdminPathname(path)
   let matched = false
 
@@ -78,8 +77,9 @@ export function canAccessPath(path, menus = [], permissions = []) {
       if (menuPathname === requestPathname) {
         if (requestPathname === '/admin/org-overview') {
           matched = normalized === normalizeAdminPath(menuPath)
+            && canViewMenuPermission(menu.permissionCode, permissions)
         } else {
-          matched = !menu.permissionCode || permissionSet.has(menu.permissionCode)
+          matched = canViewMenuPermission(menu.permissionCode, permissions)
         }
       }
       if (menu.children?.length) walk(menu.children)
@@ -88,8 +88,14 @@ export function canAccessPath(path, menus = [], permissions = []) {
 
   walk(menus)
 
-  if (!matched && (requestPathname === '/admin/live-overview' || requestPathname === '/admin/org-overview')) {
-    return permissionSet.has('tb_order:view')
+  if (!matched && requestPathname === '/admin/live-overview') {
+    return permissions.includes('tb_order:view')
+  }
+
+  if (!matched && requestPathname === '/admin/org-overview') {
+    const { search } = splitPath(path)
+    const params = new URLSearchParams(search.replace(/^\?/, ''))
+    return canAccessOrgData(params.get('org') || '', permissions)
   }
 
   return matched
@@ -99,3 +105,9 @@ export function getRoutePermission(to) {
   const record = [...to.matched].reverse().find(item => item.meta.permission)
   return record?.meta.permission || ''
 }
+
+export function canAccessOrgRoute(orgName, permissions = []) {
+  return canAccessOrgData(orgName, permissions)
+}
+
+export { canAccessOrgData, canViewMenuPermission } from '@/constants/orgPermissions'

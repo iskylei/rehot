@@ -51,17 +51,23 @@
           <el-input v-model="form.description" type="textarea" :rows="2" :disabled="!canManage" />
         </el-form-item>
         <el-form-item label="权限配置">
-          <el-checkbox-group v-model="form.permissionIds" :disabled="!canManage">
-            <el-checkbox
-              v-for="perm in permissions"
-              :key="perm.id"
-              :label="perm.id"
-              class="perm-item"
-            >
-              {{ perm.name }}
-              <span class="perm-code">({{ perm.code }})</span>
-            </el-checkbox>
-          </el-checkbox-group>
+          <div class="perm-hint">
+            机构专属账号请只勾选对应「机构数据」权限，不要勾选「查看直播订单」。
+          </div>
+          <div v-for="group in groupedPermissions" :key="group.label" class="perm-group">
+            <div class="perm-group-title">{{ group.label }}</div>
+            <el-checkbox-group v-model="form.permissionIds" :disabled="!canManage">
+              <el-checkbox
+                v-for="perm in group.items"
+                :key="perm.id"
+                :label="perm.id"
+                class="perm-item"
+              >
+                {{ perm.name }}
+                <span class="perm-code">({{ perm.code }})</span>
+              </el-checkbox>
+            </el-checkbox-group>
+          </div>
         </el-form-item>
       </el-form>
       <span slot="footer">
@@ -75,6 +81,26 @@
 <script>
 import { fetchRoles, fetchPermissions, createRole, updateRole, deleteRole } from '@/api/roles'
 import { hasPermission } from '@/utils/auth'
+import { isOrgPermissionCode } from '@/constants/orgPermissions'
+
+const PERMISSION_GROUP_RULES = [
+  {
+    label: '机构数据',
+    match: perm => isOrgPermissionCode(perm.code)
+  },
+  {
+    label: '直播订单',
+    match: perm => perm.code.startsWith('tb_order:')
+  },
+  {
+    label: '系统管理',
+    match: perm => perm.code.startsWith('system:')
+  },
+  {
+    label: '热浪业务',
+    match: perm => perm.code.startsWith('heat_wave:')
+  }
+]
 
 const emptyForm = () => ({
   name: '',
@@ -107,6 +133,30 @@ export default {
     dialogTitle() {
       if (!this.editingId) return '新增角色'
       return this.canManage ? '编辑角色' : '查看角色'
+    },
+    groupedPermissions() {
+      const usedIds = new Set()
+      const groups = PERMISSION_GROUP_RULES.map(rule => {
+        const items = this.permissions.filter(perm => {
+          if (usedIds.has(perm.id)) return false
+          return rule.match(perm)
+        })
+        items.forEach(perm => usedIds.add(perm.id))
+        return {
+          label: rule.label,
+          items
+        }
+      }).filter(group => group.items.length)
+
+      const otherItems = this.permissions.filter(perm => !usedIds.has(perm.id))
+      if (otherItems.length) {
+        groups.push({
+          label: '其他',
+          items: otherItems
+        })
+      }
+
+      return groups
     }
   },
   created() {
@@ -197,6 +247,27 @@ export default {
 
 .toolbar-title {
   font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.perm-hint {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #606266;
+  background: #f4f8fc;
+  border-radius: 4px;
+}
+
+.perm-group + .perm-group {
+  margin-top: 14px;
+}
+
+.perm-group-title {
+  margin-bottom: 6px;
+  font-size: 13px;
   font-weight: 600;
   color: #303133;
 }

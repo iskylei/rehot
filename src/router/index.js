@@ -11,6 +11,8 @@ import {
   findFirstMenuPath,
   getRoutePermission,
   normalizeAdminPath,
+  canAccessOrgRoute,
+  getAdminPathname,
   VALID_ADMIN_PATHS
 } from '@/utils/menu'
 import { Message } from 'element-ui'
@@ -48,7 +50,7 @@ const routes = [
         path: 'org-overview',
         name: 'OrgOverview',
         component: () => import('../views/admin/OrgOverview.vue'),
-        meta: { requiresAuth: true, title: '机构数据总览', permission: 'tb_order:view' }
+        meta: { requiresAuth: true, title: '机构数据总览', orgRoute: true }
       },
       {
         path: 'tb-orders',
@@ -126,6 +128,23 @@ router.beforeEach((to, from, next) => {
 
   if (to.path.startsWith('/admin/') && !normalizedTarget && to.path !== '/admin') {
     next(resolveFallbackPath(to.path))
+    return
+  }
+
+  if (to.meta.orgRoute || getAdminPathname(to.path) === '/admin/org-overview') {
+    const orgName = to.query.org || ''
+    if (!canAccessOrgRoute(orgName, getPermissions())) {
+      const fallback = resolveFallbackPath(to.fullPath)
+      Message.warning('无权限访问该页面')
+      if (fallback && fallback !== to.fullPath) {
+        next(fallback)
+      } else {
+        clearAuth()
+        next('/login')
+      }
+      return
+    }
+    next()
     return
   }
 

@@ -70,7 +70,12 @@
           <el-input
             v-model="form.path"
             placeholder="如 /admin/users；机构页：/admin/org-overview?org=联奇文化"
+            @input="handlePathInput"
           />
+          <div v-if="detectedOrgName" class="field-hint">
+            已识别机构「{{ detectedOrgName }}」，保存后将自动绑定权限
+            <span class="perm-code">{{ suggestedOrgPermissionCode }}</span>
+          </div>
         </el-form-item>
         <el-form-item label="图标">
           <el-input v-model="form.icon" placeholder="如 el-icon-user" />
@@ -78,7 +83,7 @@
         <el-form-item label="权限标识">
           <el-select v-model="form.permissionCode" placeholder="可选，用于控制可见性" clearable style="width: 100%">
             <el-option
-              v-for="perm in permissions"
+              v-for="perm in permissionOptions"
               :key="perm.code"
               :label="`${perm.name} (${perm.code})`"
               :value="perm.code"
@@ -104,6 +109,7 @@
 import { fetchMenus, fetchMenusFlat, createMenu, updateMenu, deleteMenu } from '@/api/menus'
 import { fetchPermissions } from '@/api/roles'
 import { hasPermission } from '@/utils/auth'
+import { buildOrgPermissionCode, parseOrgFromMenuPath } from '@/constants/orgPermissions'
 
 const emptyForm = () => ({
   parentId: 0,
@@ -141,12 +147,43 @@ export default {
     },
     parentOptions() {
       return this.flatMenus.filter(menu => !menu.path)
+    },
+    detectedOrgName() {
+      return parseOrgFromMenuPath(this.form.path)
+    },
+    suggestedOrgPermissionCode() {
+      if (!this.detectedOrgName) return ''
+      return buildOrgPermissionCode(this.detectedOrgName)
+    },
+    permissionOptions() {
+      if (!this.suggestedOrgPermissionCode) {
+        return this.permissions
+      }
+
+      const exists = this.permissions.some(perm => perm.code === this.suggestedOrgPermissionCode)
+      if (exists) {
+        return this.permissions
+      }
+
+      return [
+        ...this.permissions,
+        {
+          id: `pending-${this.suggestedOrgPermissionCode}`,
+          name: `查看${this.detectedOrgName}数据`,
+          code: this.suggestedOrgPermissionCode
+        }
+      ]
     }
   },
   created() {
     this.loadData()
   },
   methods: {
+    handlePathInput() {
+      const org = parseOrgFromMenuPath(this.form.path)
+      if (!org) return
+      this.form.permissionCode = buildOrgPermissionCode(org)
+    },
     async loadData() {
       this.loading = true
       try {
@@ -238,5 +275,16 @@ export default {
 
 .danger-text {
   color: #f56c6c;
+}
+
+.field-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #909399;
+}
+
+.perm-code {
+  color: #606266;
 }
 </style>

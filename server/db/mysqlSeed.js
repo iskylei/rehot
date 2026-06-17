@@ -245,10 +245,9 @@ async function seedTbOrderMenu() {
 }
 
 async function migrateOrgOverviewMenus() {
-  const orgMenus = [
-    { title: '联奇文化数据', org: '联奇文化', sortOrder: 3 },
-    { title: '柳风文化数据', org: '柳风文化', sortOrder: 4 }
-  ]
+  const { DEFAULT_ORG_OVERVIEWS } = require('../constants/orgPermissions')
+  const { ensureOrgPermission } = require('../services/orgPermissionService')
+
   const removedMenuPaths = [
     '/admin/org-overview?org=星火机构',
     '/admin/org-overview?org=蓝海机构'
@@ -263,7 +262,7 @@ async function migrateOrgOverviewMenus() {
     SET title = '联奇文化数据',
         path = '/admin/org-overview?org=联奇文化',
         icon = 'el-icon-data-line',
-        permission_code = 'tb_order:view',
+        permission_code = 'org:view:联奇文化',
         sort_order = 3,
         enabled = 1
     WHERE path = '/admin/dev-lianqi-overview'
@@ -274,23 +273,25 @@ async function migrateOrgOverviewMenus() {
   `)
   if (!business) return
 
-  for (const menu of orgMenus) {
+  for (const menu of DEFAULT_ORG_OVERVIEWS) {
     const path = `/admin/org-overview?org=${menu.org}`
+    const ensured = await ensureOrgPermission(menu.org, menu.title)
+    const permissionCode = ensured?.code || `org:view:${menu.org}`
     const existing = await appStore.queryOne('SELECT id FROM menus WHERE path = ?', [path])
     if (existing) {
       await appStore.execute(`
         UPDATE menus
-        SET title = ?, icon = 'el-icon-data-line', permission_code = 'tb_order:view',
+        SET title = ?, icon = 'el-icon-data-line', permission_code = ?,
             sort_order = ?, enabled = 1
         WHERE path = ?
-      `, [menu.title, menu.sortOrder, path])
+      `, [menu.title, permissionCode, menu.sortOrder, path])
       continue
     }
 
     await appStore.execute(
       `INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
-       VALUES (?, ?, ?, 'el-icon-data-line', 'tb_order:view', ?, 1)`,
-      [business.id, menu.title, path, menu.sortOrder]
+       VALUES (?, ?, ?, 'el-icon-data-line', ?, ?, 1)`,
+      [business.id, menu.title, path, permissionCode, menu.sortOrder]
     )
   }
 }

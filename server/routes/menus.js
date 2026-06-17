@@ -2,6 +2,7 @@ const express = require('express')
 const appStore = require('../services/appStore')
 const { authRequired, permissionRequired } = require('../middleware/auth')
 const { mapMenu, buildMenuTree } = require('../services/rbac')
+const { syncOrgMenuPermission } = require('../services/orgPermissionService')
 
 const router = express.Router()
 
@@ -40,10 +41,16 @@ router.post('/', authRequired, permissionRequired('system:menu:manage'), async (
       return res.status(400).json({ message: '菜单标题不能为空' })
     }
 
+    const resolvedPermissionCode = await syncOrgMenuPermission({
+      path,
+      title,
+      permissionCode
+    })
+
     const result = await appStore.execute(
       `INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [parentId, title, path, icon, permissionCode, sortOrder, enabled ? 1 : 0]
+      [parentId, title, path, icon, resolvedPermissionCode, sortOrder, enabled ? 1 : 0]
     )
 
     const row = await appStore.queryOne('SELECT * FROM menus WHERE id = ?', [appStore.getLastInsertId(result)])
@@ -75,6 +82,14 @@ router.put('/:id', authRequired, permissionRequired('system:menu:manage'), async
       return res.status(400).json({ message: '上级菜单不能选择自身' })
     }
 
+    const nextPath = path ?? existing.path
+    const nextTitle = title ?? existing.title
+    const resolvedPermissionCode = await syncOrgMenuPermission({
+      path: nextPath,
+      title: nextTitle,
+      permissionCode: permissionCode ?? existing.permission_code
+    })
+
     const now = appStore.currentTimestamp()
     await appStore.execute(
       `UPDATE menus
@@ -83,10 +98,10 @@ router.put('/:id', authRequired, permissionRequired('system:menu:manage'), async
        WHERE id = ?`,
       [
         nextParentId,
-        title ?? existing.title,
-        path ?? existing.path,
+        nextTitle,
+        nextPath,
         icon ?? existing.icon,
-        permissionCode ?? existing.permission_code,
+        resolvedPermissionCode,
         sortOrder ?? existing.sort_order,
         enabled === undefined ? existing.enabled : (enabled ? 1 : 0),
         now,

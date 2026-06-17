@@ -304,10 +304,8 @@ function seedTbOrderMenu() {
 }
 
 function migrateOrgOverviewMenus() {
-  const orgMenus = [
-    { title: '联奇文化数据', org: '联奇文化', sortOrder: 3 },
-    { title: '柳风文化数据', org: '柳风文化', sortOrder: 4 }
-  ]
+  const { DEFAULT_ORG_OVERVIEWS } = require('./constants/orgPermissions')
+
   const removedMenuPaths = [
     '/admin/org-overview?org=星火机构',
     '/admin/org-overview?org=蓝海机构'
@@ -317,12 +315,34 @@ function migrateOrgOverviewMenus() {
     db.prepare('DELETE FROM menus WHERE path = ?').run(path)
   })
 
+  function ensureOrgPermissionSync(orgName) {
+    const { buildOrgPermissionMeta } = require('./constants/orgPermissions')
+    const meta = buildOrgPermissionMeta(orgName)
+    if (!meta.org) return ''
+
+    db.prepare(`
+      INSERT OR IGNORE INTO permissions (name, code, description)
+      VALUES (?, ?, ?)
+    `).run(meta.name, meta.code, meta.description)
+
+    const permission = db.prepare('SELECT id FROM permissions WHERE code = ?').get(meta.code)
+    const adminRole = db.prepare("SELECT id FROM roles WHERE code = 'admin'").get()
+    if (permission && adminRole) {
+      db.prepare(`
+        INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
+        VALUES (?, ?)
+      `).run(adminRole.id, permission.id)
+    }
+
+    return meta.code
+  }
+
   db.prepare(`
     UPDATE menus
     SET title = '联奇文化数据',
         path = '/admin/org-overview?org=联奇文化',
         icon = 'el-icon-data-line',
-        permission_code = 'tb_order:view',
+        permission_code = 'org:view:联奇文化',
         sort_order = 3,
         enabled = 1
     WHERE path = '/admin/dev-lianqi-overview'
@@ -333,23 +353,24 @@ function migrateOrgOverviewMenus() {
   `).get()
   if (!business) return
 
-  orgMenus.forEach(menu => {
+  DEFAULT_ORG_OVERVIEWS.forEach(menu => {
     const path = `/admin/org-overview?org=${menu.org}`
+    const permissionCode = ensureOrgPermissionSync(menu.org)
     const existing = db.prepare('SELECT id FROM menus WHERE path = ?').get(path)
     if (existing) {
       db.prepare(`
         UPDATE menus
-        SET title = ?, icon = 'el-icon-data-line', permission_code = 'tb_order:view',
+        SET title = ?, icon = 'el-icon-data-line', permission_code = ?,
             sort_order = ?, enabled = 1
         WHERE path = ?
-      `).run(menu.title, menu.sortOrder, path)
+      `).run(menu.title, permissionCode, menu.sortOrder, path)
       return
     }
 
     db.prepare(`
       INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
-      VALUES (?, ?, ?, 'el-icon-data-line', 'tb_order:view', ?, 1)
-    `).run(business.id, menu.title, path, menu.sortOrder)
+      VALUES (?, ?, ?, 'el-icon-data-line', ?, ?, 1)
+    `).run(business.id, menu.title, path, permissionCode, menu.sortOrder)
   })
 }
 

@@ -1,6 +1,7 @@
 const express = require('express')
 const { mapSysTbOrder } = require('../db')
-const { authRequired, permissionRequired } = require('../middleware/auth')
+const { authRequired } = require('../middleware/auth')
+const { liveOverviewAccessRequired } = require('../middleware/liveOverviewAccess')
 const { ORDER_STATUS_OPTIONS } = require('../constants/tbOrderStatus')
 const {
   fetchRowsPaged,
@@ -18,9 +19,7 @@ const { resolveOrderFilters } = require('../utils/orderFilters')
 
 const router = express.Router()
 
-router.use(authRequired, permissionRequired('tb_order:view'))
-
-router.get('/stats', async (req, res) => {
+router.get('/stats', authRequired, liveOverviewAccessRequired({ scope: 'global' }), async (req, res) => {
   try {
     const { startDate = '', endDate = '' } = req.query
     const stats = await calcGlobalOverview({ startDate, endDate })
@@ -42,7 +41,7 @@ router.get('/stats', async (req, res) => {
   }
 })
 
-router.get('/org-stats', async (req, res) => {
+router.get('/org-stats', authRequired, liveOverviewAccessRequired({ scope: 'org' }), async (req, res) => {
   try {
     const { orgName = '', startDate = '', endDate = '' } = req.query
     const scopedLoginUserName = String(orgName).trim()
@@ -75,11 +74,11 @@ router.get('/org-stats', async (req, res) => {
   }
 })
 
-router.get('/order-statuses', (req, res) => {
+router.get('/order-statuses', authRequired, liveOverviewAccessRequired({ scope: 'org-capable' }), (req, res) => {
   res.json({ items: ORDER_STATUS_OPTIONS })
 })
 
-router.get('/product-chart', async (req, res) => {
+router.get('/product-chart', authRequired, liveOverviewAccessRequired(), async (req, res) => {
   try {
     const items = (await calcProductChartStats(resolveOrderFilters(req.query))).map(item => ({
       paidDate: item.paidDate,
@@ -94,7 +93,7 @@ router.get('/product-chart', async (req, res) => {
   }
 })
 
-router.get('/product-commission-chart', async (req, res) => {
+router.get('/product-commission-chart', authRequired, liveOverviewAccessRequired(), async (req, res) => {
   try {
     const result = await calcProductCommissionStats(resolveOrderFilters(req.query))
 
@@ -113,7 +112,7 @@ router.get('/product-commission-chart', async (req, res) => {
   }
 })
 
-router.get('/ad-user-amount-chart', async (req, res) => {
+router.get('/ad-user-amount-chart', authRequired, liveOverviewAccessRequired(), async (req, res) => {
   try {
     const result = await calcAdUserAmountStats(resolveOrderFilters(req.query))
 
@@ -133,7 +132,7 @@ router.get('/ad-user-amount-chart', async (req, res) => {
   }
 })
 
-router.get('/seller-amount-chart', async (req, res) => {
+router.get('/seller-amount-chart', authRequired, liveOverviewAccessRequired(), async (req, res) => {
   try {
     const result = await calcSellerAmountStats(resolveOrderFilters(req.query))
 
@@ -153,7 +152,7 @@ router.get('/seller-amount-chart', async (req, res) => {
   }
 })
 
-router.get('/hourly-amount-chart', async (req, res) => {
+router.get('/hourly-amount-chart', authRequired, liveOverviewAccessRequired(), async (req, res) => {
   try {
     const result = await calcHourlyAmountStats(resolveOrderFilters(req.query))
 
@@ -174,7 +173,7 @@ router.get('/hourly-amount-chart', async (req, res) => {
   }
 })
 
-router.get('/daily-amount-chart', async (req, res) => {
+router.get('/daily-amount-chart', authRequired, liveOverviewAccessRequired(), async (req, res) => {
   try {
     const result = await calcDailyAmountStats(resolveOrderFilters(req.query))
 
@@ -193,7 +192,7 @@ router.get('/daily-amount-chart', async (req, res) => {
   }
 })
 
-router.get('/export', async (req, res) => {
+router.get('/export', authRequired, liveOverviewAccessRequired({ scope: 'global' }), async (req, res) => {
   try {
     const { startDate = '', endDate = '' } = req.query
 
@@ -221,7 +220,7 @@ router.get('/export', async (req, res) => {
   }
 })
 
-router.get('/org-export', async (req, res) => {
+router.get('/org-export', authRequired, liveOverviewAccessRequired({ scope: 'org' }), async (req, res) => {
   try {
     const { orgName = '', startDate = '', endDate = '' } = req.query
     const scopedLoginUserName = String(orgName).trim()
@@ -254,7 +253,7 @@ router.get('/org-export', async (req, res) => {
   }
 })
 
-router.get('/orders', async (req, res) => {
+router.get('/orders', authRequired, liveOverviewAccessRequired(), async (req, res) => {
   try {
     const {
       page = '1',
