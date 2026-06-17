@@ -102,20 +102,30 @@
 
       <el-row :gutter="16" class="charts-row">
         <el-col :span="24">
-          <el-card shadow="never" class="chart-card chart-card--product" v-loading="chartLoading">
+          <el-card shadow="never" class="chart-card chart-card--product" v-loading="adUserChartLoading">
             <div slot="header" class="chart-header">
-              <span>商品支付统计</span>
-              <span class="chart-subtitle">按支付日期与商品名称汇总</span>
+              <span>达人支付与佣金统计</span>
+              <span class="chart-subtitle">支付日期：{{ adUserChartDateRange || '-' }}</span>
             </div>
             <div class="chart-body">
-              <div ref="productChart" class="product-chart product-chart--main"></div>
-              <div v-if="!chartLoading && !chartHasData" class="chart-empty">暂无统计数据</div>
+              <div ref="adUserChart" class="product-chart product-chart--main"></div>
+              <div v-if="!adUserChartLoading && !adUserChartHasData" class="chart-empty">所选日期暂无达人数据</div>
             </div>
           </el-card>
         </el-col>
       </el-row>
 
       <el-row :gutter="16" class="charts-row">
+        <el-col :span="12">
+          <el-card shadow="never" class="chart-card" v-loading="chartLoading">
+            <div slot="header" class="chart-header">
+              <span>商品支付统计</span>
+              <span class="chart-subtitle">按支付日期与商品名称汇总</span>
+            </div>
+            <div ref="productChart" class="product-chart"></div>
+            <div v-if="!chartLoading && !chartHasData" class="chart-empty">暂无统计数据</div>
+          </el-card>
+        </el-col>
         <el-col :span="12">
           <el-card shadow="never" class="chart-card" v-loading="commissionChartLoading">
             <div slot="header" class="chart-header">
@@ -124,16 +134,6 @@
             </div>
             <div ref="commissionChart" class="product-chart"></div>
             <div v-if="!commissionChartLoading && !commissionChartHasData" class="chart-empty">所选日期暂无佣金数据</div>
-          </el-card>
-        </el-col>
-        <el-col :span="12">
-          <el-card shadow="never" class="chart-card" v-loading="adUserChartLoading">
-            <div slot="header" class="chart-header">
-              <span>达人支付与佣金统计</span>
-              <span class="chart-subtitle">支付日期：{{ adUserChartDateRange || '-' }}</span>
-            </div>
-            <div ref="adUserChart" class="product-chart"></div>
-            <div v-if="!adUserChartLoading && !adUserChartHasData" class="chart-empty">所选日期暂无达人数据</div>
           </el-card>
         </el-col>
       </el-row>

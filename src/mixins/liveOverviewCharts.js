@@ -142,9 +142,16 @@ export default {
       }
     },
     buildChartOption(items) {
-      const categories = items.map(item => `${item.paidDate}\n${this.truncateTitle(item.itemTitle)}`)
-      const amounts = items.map(item => Number(item.totalAmount) || 0)
-      const counts = items.map(item => Number(item.orderCount) || 0)
+      const sortedItems = [...items].sort((a, b) => {
+        const amountDiff = (Number(b.totalAmount) || 0) - (Number(a.totalAmount) || 0)
+        if (amountDiff !== 0) return amountDiff
+        const dateDiff = String(b.paidDate).localeCompare(String(a.paidDate))
+        if (dateDiff !== 0) return dateDiff
+        return String(a.itemTitle).localeCompare(String(b.itemTitle), 'zh-CN')
+      })
+      const categories = sortedItems.map(item => `${item.paidDate}\n${this.truncateTitle(item.itemTitle)}`)
+      const amounts = sortedItems.map(item => Number(item.totalAmount) || 0)
+      const counts = sortedItems.map(item => Number(item.orderCount) || 0)
       const showZoom = categories.length > 8
 
       return {
@@ -153,7 +160,7 @@ export default {
           axisPointer: { type: 'cross' },
           formatter: params => {
             const index = params[0]?.dataIndex ?? 0
-            const item = items[index]
+            const item = sortedItems[index]
             if (!item) return ''
             return [
               `支付日期：${item.paidDate}`,

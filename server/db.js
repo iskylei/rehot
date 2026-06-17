@@ -306,10 +306,16 @@ function seedTbOrderMenu() {
 function migrateOrgOverviewMenus() {
   const orgMenus = [
     { title: '联奇文化数据', org: '联奇文化', sortOrder: 3 },
-    { title: '柳风文化数据', org: '柳风文化', sortOrder: 4 },
-    { title: '星火机构数据', org: '星火机构', sortOrder: 5 },
-    { title: '蓝海机构数据', org: '蓝海机构', sortOrder: 6 }
+    { title: '柳风文化数据', org: '柳风文化', sortOrder: 4 }
   ]
+  const removedMenuPaths = [
+    '/admin/org-overview?org=星火机构',
+    '/admin/org-overview?org=蓝海机构'
+  ]
+
+  removedMenuPaths.forEach(path => {
+    db.prepare('DELETE FROM menus WHERE path = ?').run(path)
+  })
 
   db.prepare(`
     UPDATE menus

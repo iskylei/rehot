@@ -364,7 +364,7 @@ async function calcProductChartStats(filters = {}) {
       AND order_paid_time IS NOT NULL
       AND ${orderStore.trimExpr('order_paid_time')} != ''
     GROUP BY paid_date, item_title
-    ORDER BY paid_date ASC, item_title ASC
+    ORDER BY total_amount DESC, paid_date DESC, item_title ASC
   `, params)
 
   return rows.map(row => ({
