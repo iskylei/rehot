@@ -38,6 +38,9 @@
               style="width: 260px"
             />
           </el-form-item>
+          <el-form-item label="店铺名称">
+            <el-input v-model="exportSellerNick" placeholder="店铺/服务商" clearable style="width: 180px" />
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleStatsSearch">查询</el-button>
             <el-button
@@ -239,6 +242,7 @@ export default {
       statsLoading: false,
       exportLoading: false,
       statsDateRange: getDefaultDateRange(),
+      exportSellerNick: '',
       stats: {
         totalOrderAmount: '0.00',
         todayOrderAmount: '0.00',
@@ -308,8 +312,12 @@ export default {
       return {
         orgName: this.orgName,
         startDate: dateRange[0],
-        endDate: dateRange[1]
+        endDate: dateRange[1],
+        sellerNick: this.exportSellerNick
       }
+    },
+    buildExportParams() {
+      return this.buildStatsParams()
     },
     buildChartFilterParams() {
       const dateRange = this.chartFilters.dateRange?.length === 2
@@ -399,7 +407,7 @@ export default {
       this.loadList()
     },
     async handleExport() {
-      const params = this.buildStatsParams()
+      const params = this.buildExportParams()
       if (!params.orgName) {
         this.$message.warning('未指定机构名称，无法导出')
         return

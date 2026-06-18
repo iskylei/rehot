@@ -26,6 +26,9 @@
             style="width: 260px"
           />
         </el-form-item>
+        <el-form-item label="店铺名称">
+          <el-input v-model="exportSellerNick" placeholder="店铺/服务商" clearable style="width: 180px" />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleStatsSearch">查询</el-button>
           <el-button type="success" icon="el-icon-download" :loading="exportLoading" @click="handleExport">
@@ -235,6 +238,7 @@ export default {
       statsLoading: false,
       exportLoading: false,
       statsDateRange: getDefaultDateRange(),
+      exportSellerNick: '',
       listLoading: false,
       chartLoading: false,
       commissionChartLoading: false,
@@ -333,8 +337,12 @@ export default {
 
       return {
         startDate: dateRange[0],
-        endDate: dateRange[1]
+        endDate: dateRange[1],
+        sellerNick: this.exportSellerNick
       }
+    },
+    buildExportParams() {
+      return this.buildStatsParams()
     },
     buildFilterParams() {
       const dateRange = this.filters.dateRange?.length === 2
@@ -1121,7 +1129,7 @@ export default {
       this.loadStats()
     },
     async handleExport() {
-      const params = this.buildStatsParams()
+      const params = this.buildExportParams()
       if (!params.startDate || !params.endDate) {
         this.$message.warning('请选择支付日期范围后再导出')
         return

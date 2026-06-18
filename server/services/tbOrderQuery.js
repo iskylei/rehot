@@ -399,10 +399,16 @@ async function calcGlobalOverview(filters = {}) {
   if (filters.scopedLoginUserName) {
     globalFilters.scopedLoginUserName = filters.scopedLoginUserName
   }
+
+  const selectedFilters = { ...globalFilters }
+  if (filters.sellerNick) {
+    selectedFilters.sellerNick = filters.sellerNick
+  }
+
   const { sql: globalSql, params: globalParams } = buildWhereClause(globalFilters, { excludeDateRange: true })
   const { sql: periodSql, params: periodParams } = buildWhereClause(globalFilters, { excludeDateRange: true })
   const { sql: selectedSql, params: selectedParams } = buildWhereClause({
-    ...globalFilters,
+    ...selectedFilters,
     startDate: selectedStart,
     endDate: selectedEnd
   })

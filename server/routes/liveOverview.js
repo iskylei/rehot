@@ -21,8 +21,7 @@ const router = express.Router()
 
 router.get('/stats', authRequired, liveOverviewAccessRequired({ scope: 'global' }), async (req, res) => {
   try {
-    const { startDate = '', endDate = '' } = req.query
-    const stats = await calcGlobalOverview({ startDate, endDate })
+    const stats = await calcGlobalOverview(resolveOrderFilters(req.query))
     res.json({
       stats: {
         totalOrderAmount: formatAmount(stats.totalOrderAmount),
@@ -43,18 +42,19 @@ router.get('/stats', authRequired, liveOverviewAccessRequired({ scope: 'global' 
 
 router.get('/org-stats', authRequired, liveOverviewAccessRequired({ scope: 'org' }), async (req, res) => {
   try {
-    const { orgName = '', startDate = '', endDate = '' } = req.query
+    const { orgName = '' } = req.query
     const scopedLoginUserName = String(orgName).trim()
 
     if (!scopedLoginUserName) {
       return res.status(400).json({ message: '请指定机构名称' })
     }
 
-    const stats = await calcGlobalOverview({
-      startDate,
-      endDate,
-      scopedLoginUserName
-    })
+    const stats = await calcGlobalOverview(
+      resolveOrderFilters({
+        ...req.query,
+        orgName: scopedLoginUserName
+      })
+    )
     res.json({
       orgName: scopedLoginUserName,
       stats: {
@@ -200,10 +200,9 @@ router.get('/export', authRequired, liveOverviewAccessRequired({ scope: 'global'
       return res.status(400).json({ message: '请选择支付日期范围后再导出' })
     }
 
-    const { buffer, rowCount, filename } = await buildLiveOverviewExcelBuffer({
-      startDate,
-      endDate
-    })
+    const { buffer, rowCount, filename } = await buildLiveOverviewExcelBuffer(
+      resolveOrderFilters(req.query)
+    )
 
     res.setHeader(
       'Content-Type',
@@ -232,11 +231,12 @@ router.get('/org-export', authRequired, liveOverviewAccessRequired({ scope: 'org
       return res.status(400).json({ message: '请选择支付日期范围后再导出' })
     }
 
-    const { buffer, rowCount, filename } = await buildLiveOverviewExcelBuffer({
-      startDate,
-      endDate,
-      scopedLoginUserName
-    })
+    const { buffer, rowCount, filename } = await buildLiveOverviewExcelBuffer(
+      resolveOrderFilters({
+        ...req.query,
+        orgName: scopedLoginUserName
+      })
+    )
 
     res.setHeader(
       'Content-Type',
