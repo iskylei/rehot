@@ -35,7 +35,8 @@
     "multer": "^2.0.2",
     "mysql2": "^3.14.0",
     "vue": "^2.7.16",
-    "vue-router": "^3.6.5"
+    "vue-router": "^3.6.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",

@@ -34,7 +34,8 @@ const distPath = path.join(__dirname, '../dist')
 const hasDist = fs.existsSync(path.join(distPath, 'index.html'))
 
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '20mb' }))
+app.use(express.urlencoded({ extended: true, limit: '20mb' }))
 app.use('/uploads', express.static(uploadsPath))
 
 app.get('/api/health', async (req, res) => {

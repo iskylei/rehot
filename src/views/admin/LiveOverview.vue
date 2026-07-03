@@ -31,6 +31,14 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleStatsSearch">查询</el-button>
+          <el-button
+            v-if="canManageImport"
+            type="warning"
+            icon="el-icon-upload2"
+            @click="openImport"
+          >
+            导入 Excel
+          </el-button>
           <el-button type="success" icon="el-icon-download" :loading="exportLoading" @click="handleExport">
             导出 Excel
           </el-button>
@@ -204,6 +212,57 @@
         />
       </div>
     </el-card>
+
+    <el-dialog title="导入直播订单" :visible.sync="importVisible" width="760px" @closed="resetImport">
+      <div class="import-tip">
+        请使用 Excel 文件，表头需与模板一致。日期字段请使用 `yyyy-MM-dd HH:mm:ss` 格式，例如 `2026-05-13 10:56:00`。
+        <el-button type="text" @click="handleDownloadImportTemplate">下载导入模板</el-button>
+      </div>
+      <el-upload
+        drag
+        action=""
+        :auto-upload="false"
+        :show-file-list="false"
+        accept=".xlsx,.xls"
+        :on-change="handleImportFileChange"
+      >
+        <i class="el-icon-upload" />
+        <div class="el-upload__text">将 Excel 文件拖到此处，或<em>点击上传</em></div>
+      </el-upload>
+
+      <div v-if="importPreview.length" class="import-preview">
+        <div class="import-preview__title">预览（前 {{ importPreview.length }} 条，共 {{ importRows.length }} 条）</div>
+        <el-table :data="importPreview" size="mini" border max-height="240">
+          <el-table-column label="biz-order id" min-width="140">
+            <template slot-scope="{ row }">{{ row['biz-order id'] || row.biz_order_id || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="item title" min-width="140" show-overflow-tooltip>
+            <template slot-scope="{ row }">{{ row['item title'] || row.item_title || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="order status" width="100">
+            <template slot-scope="{ row }">{{ row['order status'] || row.order_status || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="order paid time" width="140">
+            <template slot-scope="{ row }">{{ row['order paid time'] || row.order_paid_time || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="order amount" width="90">
+            <template slot-scope="{ row }">{{ row['order amount'] || row.order_amount || '-' }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <span slot="footer">
+        <el-button @click="importVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="importing"
+          :disabled="!importFile"
+          @click="handleImport"
+        >
+          确认导入 {{ importRows.length ? `(${importRows.length} 条)` : '' }}
+        </el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
@@ -221,6 +280,9 @@ import {
   fetchDailyAmountChart,
   downloadLiveOverviewExport
 } from '@/api/liveOverview'
+import { importTbOrdersExcel, downloadTbOrderExcelTemplate } from '@/api/tbOrders'
+import { parseExcelFile } from '@/utils/excel'
+import { hasPermission } from '@/utils/auth'
 
 function getDefaultDateRange() {
   const today = new Date()
@@ -237,6 +299,11 @@ export default {
     return {
       statsLoading: false,
       exportLoading: false,
+      importVisible: false,
+      importing: false,
+      importRows: [],
+      importPreview: [],
+      importFile: null,
       statsDateRange: getDefaultDateRange(),
       exportSellerNick: '',
       listLoading: false,
@@ -292,6 +359,9 @@ export default {
     }
   },
   computed: {
+    canManageImport() {
+      return hasPermission('tb_order:manage')
+    },
     globalStatCards() {
       return [
         { key: 'total', label: '订单支付总金额(元)', value: this.stats.totalOrderAmount },
@@ -1150,6 +1220,82 @@ export default {
         this.exportLoading = false
       }
     },
+    openImport() {
+      this.importVisible = true
+    },
+    resetImport() {
+      this.importRows = []
+      this.importPreview = []
+      this.importFile = null
+      this.importing = false
+    },
+    async handleDownloadImportTemplate() {
+      try {
+        const blob = await downloadTbOrderExcelTemplate()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = '直播订单导入模板.xlsx'
+        link.click()
+        window.URL.revokeObjectURL(url)
+      } catch (error) {
+        this.$message.error(error.message || '模板下载失败')
+      }
+    },
+    async handleImportFileChange(file) {
+      const raw = file.raw
+      if (!raw) return
+      this.importFile = raw
+      try {
+        const rows = await parseExcelFile(raw)
+        if (!rows.length) {
+          this.importRows = []
+          this.importPreview = []
+          this.$message.warning('未解析到有效数据，请检查 Excel 文件')
+          return
+        }
+        this.importRows = rows
+        this.importPreview = rows.slice(0, 5)
+        this.$message.success(`已解析 ${rows.length} 条记录`)
+      } catch (error) {
+        this.importRows = []
+        this.importPreview = []
+        this.$message.error('Excel 解析失败')
+      }
+    },
+    async handleImport() {
+      if (!this.importFile) {
+        this.$message.warning('请先上传 Excel 文件')
+        return
+      }
+      this.importing = true
+      try {
+        const res = await importTbOrdersExcel(this.importFile)
+        const failed = res.failed || 0
+        const skipped = res.skipped || 0
+        const success = res.success || 0
+        let message = `导入完成：成功 ${success} 条`
+        if (skipped) message += `，跳过重复 ${skipped} 条`
+        if (failed) message += `，失败 ${failed} 条`
+        this.$message.success(message)
+        this.importVisible = false
+        this.refreshPageData()
+      } catch (error) {
+        this.$message.error(error.message)
+      } finally {
+        this.importing = false
+      }
+    },
+    refreshPageData() {
+      this.loadStats()
+      this.loadList()
+      this.loadChart()
+      this.loadCommissionChart()
+      this.loadAdUserChart()
+      this.loadSellerChart()
+      this.loadHourlyChart()
+      this.loadDailyChart()
+    },
     async loadChart() {
       this.chartLoading = true
       try {
@@ -1356,6 +1502,23 @@ export default {
   color: #909399;
   font-size: 14px;
   pointer-events: none;
+}
+
+.import-tip {
+  margin-bottom: 12px;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.import-preview {
+  margin-top: 16px;
+}
+
+.import-preview__title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #303133;
 }
 
 .pagination-wrap {

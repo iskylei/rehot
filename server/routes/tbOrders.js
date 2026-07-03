@@ -1,4 +1,5 @@
 const express = require('express')
+const multer = require('multer')
 const { mapSysTbOrder } = require('../db')
 const { authRequired, permissionRequired } = require('../middleware/auth')
 const orderStore = require('../services/orderStore')
@@ -9,8 +10,29 @@ const {
   buildUpdateSets,
   CAMEL_TO_DB
 } = require('../constants/tbOrderFields')
+const {
+  buildExcelImportTemplateBuffer,
+  parseExcelBuffer,
+  importTbOrderItems
+} = require('../services/tbOrderImport')
 
 const router = express.Router()
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 30 * 1024 * 1024 },
+  fileFilter(req, file, cb) {
+    const name = String(file.originalname || '').toLowerCase()
+    const allowedMime = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ]
+    if (allowedMime.includes(file.mimetype) || name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      cb(null, true)
+      return
+    }
+    cb(new Error('仅支持上传 Excel 文件（.xlsx / .xls）'))
+  }
+})
 
 router.use(authRequired, permissionRequired('tb_order:view'))
 
@@ -26,6 +48,23 @@ function validateOrder(payload, isUpdate = false) {
   }
   return errors
 }
+
+router.get('/import/excel-template', (req, res) => {
+  try {
+    const buffer = buildExcelImportTemplateBuffer()
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename*=UTF-8\'\'%E7%9B%B4%E6%92%AD%E8%AE%A2%E5%8D%95%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx'
+    )
+    res.send(buffer)
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
 
 router.get('/import/template', (req, res) => {
   const headerLine = CSV_TEMPLATE_HEADERS.join(',')
@@ -133,62 +172,42 @@ router.get('/:id', async (req, res) => {
   }
 })
 
+router.post('/import/excel', permissionRequired('tb_order:manage'), (req, res, next) => {
+  excelUpload.single('file')(req, res, err => {
+    if (err) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? 'Excel 文件过大，请控制在 30MB 以内'
+        : (err.message || '文件上传失败')
+      return res.status(400).json({ message })
+    }
+    next()
+  })
+}, async (req, res) => {
+  try {
+    if (!req.file?.buffer?.length) {
+      return res.status(400).json({ message: '请上传 Excel 文件' })
+    }
+
+    const items = parseExcelBuffer(req.file.buffer)
+    if (!items.length) {
+      return res.status(400).json({ message: '未解析到有效数据，请检查 Excel 文件' })
+    }
+
+    const result = await importTbOrderItems(items, req.user?.username || '')
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
 router.post('/import', permissionRequired('tb_order:manage'), async (req, res) => {
   try {
     const { items = [] } = req.body || {}
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: '导入数据不能为空' })
+    const result = await importTbOrderItems(items, req.user?.username || '')
+    if (!items.length) {
+      return res.status(400).json({ message: result.message || '导入数据不能为空' })
     }
-
-    const operator = req.user?.username || ''
-    const table = orderStore.getOrdersTableRef()
-    let success = 0
-    let skipped = 0
-    const errors = []
-
-    const importRows = async () => {
-      for (let index = 0; index < items.length; index += 1) {
-        const raw = items[index]
-        const payload = normalizePayload(raw)
-        const rowErrors = validateOrder(payload)
-        if (rowErrors.length) {
-          errors.push({ row: index + 1, message: rowErrors.join('；') })
-          continue
-        }
-
-        const existing = await orderStore.queryOne(
-          `SELECT id FROM ${table} WHERE biz_order_id = ?`,
-          [payload.bizOrderId]
-        )
-        if (existing) {
-          skipped += 1
-          continue
-        }
-
-        try {
-          const dbRow = payloadToDbRow(payload, operator)
-          const columns = Object.keys(dbRow)
-          const placeholders = columns.map(() => '?').join(', ')
-          await orderStore.execute(
-            `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
-            columns.map(col => dbRow[col])
-          )
-          success += 1
-        } catch (error) {
-          errors.push({ row: index + 1, message: error.message })
-        }
-      }
-    }
-
-    await importRows()
-
-    res.json({
-      total: items.length,
-      success,
-      skipped,
-      failed: errors.length,
-      errors: errors.slice(0, 20)
-    })
+    res.json(result)
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

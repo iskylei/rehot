@@ -1,3 +1,5 @@
+const { normalizeImportDateTime } = require('../utils/importDateTime')
+
 const HEADER_ALIASES = {
   biz_order_id: 'bizOrderId',
   '淘宝子编号': 'bizOrderId',
@@ -16,7 +18,9 @@ const HEADER_ALIASES = {
   order_status: 'orderStatus',
   '订单状态': 'orderStatus',
   order_paid_time: 'orderPaidTime',
+  'order paid time': 'orderPaidTime',
   '支付日期': 'orderPaidTime',
+  '支付时间': 'orderPaidTime',
   order_amount: 'orderAmount',
   '支付金额': 'orderAmount',
   predict_amount: 'predictAmount',
@@ -35,9 +39,32 @@ const HEADER_ALIASES = {
   '购买数量': 'buyAmount',
   login_user_name: 'loginUserName',
   '机构名称': 'loginUserName',
+  'login user name': 'loginUserName',
+  create_time: 'createTime',
+  'create time': 'createTime',
+  '创建时间': 'createTime',
+  seller_commission_rate: 'sellerCommissionRatio',
+  'seller commission rate': 'sellerCommissionRatio',
   user_flow: 'userFlow',
   '流量': 'userFlow'
 }
+
+const EXCEL_IMPORT_HEADERS = [
+  'parent order id',
+  'biz-order id',
+  'seller nick',
+  'item title',
+  'item id',
+  'ad user nick',
+  'login user name',
+  'order status',
+  'create time',
+  'order paid time',
+  'order amount',
+  'refund amount',
+  'seller commission rate',
+  'predict amount'
+]
 
 const CAMEL_TO_DB = {
   bizOrderId: 'biz_order_id',
@@ -83,21 +110,69 @@ const CSV_TEMPLATE_HEADERS = [
   'user_flow'
 ]
 
-function normalizeHeader(header) {
-  const key = String(header || '').trim().replace(/^\uFEFF/, '')
-  if (HEADER_ALIASES[key]) return HEADER_ALIASES[key]
-  if (CAMEL_TO_DB[key]) return key
+function normalizeHeaderText(header) {
+  return String(header || '').trim().replace(/^\uFEFF/, '').replace(/\s+/g, ' ')
+}
+
+function isPaymentDateHeader(header) {
+  const text = normalizeHeaderText(header).toLowerCase()
+  return text === 'order paid time'
+    || text === 'order_paid_time'
+    || text === '支付日期'
+    || text === '支付时间'
+    || /^paid[\s_-]*time$/.test(text)
+    || /^order[\s_-]*paid[\s_-]*time$/.test(text)
+}
+
+function isCreateTimeHeader(header) {
+  const text = normalizeHeaderText(header).toLowerCase()
+  return text === 'create time'
+    || text === 'create_time'
+    || text === '创建时间'
+    || /^create[\s_-]*time$/.test(text)
+}
+
+function resolveImportFieldKey(header) {
+  const normalizedHeader = normalizeHeaderText(header)
+  const normalizedKey = normalizeHeader(normalizedHeader)
+  if (normalizedKey) return normalizedKey
+  if (isPaymentDateHeader(normalizedHeader)) return 'orderPaidTime'
+  if (isCreateTimeHeader(normalizedHeader)) return 'createTime'
   return null
 }
+
+function normalizeHeader(header) {
+  const raw = normalizeHeaderText(header)
+  if (!raw) return null
+  if (HEADER_ALIASES[raw]) return HEADER_ALIASES[raw]
+  if (CAMEL_TO_DB[raw]) return raw
+
+  const lowered = raw.toLowerCase()
+  if (HEADER_ALIASES[lowered]) return HEADER_ALIASES[lowered]
+
+  const snakeKey = lowered.replace(/[\s-]+/g, '_')
+  if (HEADER_ALIASES[snakeKey]) return HEADER_ALIASES[snakeKey]
+
+  const camelKey = snakeKey.replace(/_([a-z])/g, (_, char) => char.toUpperCase())
+  if (CAMEL_TO_DB[camelKey]) return camelKey
+
+  return null
+}
+
+const DATE_TIME_FIELDS = new Set(['createTime', 'orderPaidTime'])
 
 function normalizePayload(raw = {}) {
   const result = {}
   Object.entries(raw).forEach(([key, value]) => {
-    const normalizedKey = normalizeHeader(key) || (CAMEL_TO_DB[key] ? key : null)
+    const normalizedKey = resolveImportFieldKey(key)
     if (!normalizedKey) return
     if (normalizedKey === 'buyAmount') {
       const num = value === '' || value == null ? null : Number(value)
       result.buyAmount = Number.isNaN(num) ? null : num
+      return
+    }
+    if (DATE_TIME_FIELDS.has(normalizedKey)) {
+      result[normalizedKey] = normalizeImportDateTime(value)
       return
     }
     result[normalizedKey] = value == null ? '' : String(value).trim()
@@ -113,11 +188,15 @@ function payloadToDbRow(payload, operator = '') {
       row[dbCol] = payload.buyAmount == null || payload.buyAmount === '' ? null : Number(payload.buyAmount)
       return
     }
+    if (camel === 'createTime' || camel === 'orderPaidTime') {
+      row[dbCol] = payload[camel] ? normalizeImportDateTime(payload[camel]) : ''
+      return
+    }
     row[dbCol] = payload[camel] ?? ''
   })
   row.create_by = payload.createBy || operator
   row.update_by = operator
-  row.create_time = payload.createTime || now
+  row.create_time = payload.createTime ? normalizeImportDateTime(payload.createTime) : now
   row.update_time = now
   return row
 }
@@ -147,7 +226,11 @@ module.exports = {
   HEADER_ALIASES,
   CAMEL_TO_DB,
   CSV_TEMPLATE_HEADERS,
+  EXCEL_IMPORT_HEADERS,
   normalizeHeader,
+  resolveImportFieldKey,
+  isPaymentDateHeader,
+  isCreateTimeHeader,
   normalizePayload,
   payloadToDbRow,
   buildUpdateSets
