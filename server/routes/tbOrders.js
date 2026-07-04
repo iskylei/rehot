@@ -213,6 +213,41 @@ router.post('/import', permissionRequired('tb_order:manage'), async (req, res) =
   }
 })
 
+router.post('/batch-delete', permissionRequired('tb_order:manage'), async (req, res) => {
+  try {
+    const { ids = [] } = req.body || {}
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ message: '请选择要删除的订单' })
+    }
+
+    const normalizedIds = [...new Set(
+      ids
+        .map(id => Number(id))
+        .filter(id => Number.isInteger(id) && id > 0)
+    )]
+
+    if (!normalizedIds.length) {
+      return res.status(400).json({ message: '无效的订单 ID' })
+    }
+
+    if (normalizedIds.length > 500) {
+      return res.status(400).json({ message: '单次最多删除 500 条订单' })
+    }
+
+    const table = orderStore.getOrdersTableRef()
+    const placeholders = normalizedIds.map(() => '?').join(', ')
+    const result = await orderStore.execute(
+      `DELETE FROM ${table} WHERE id IN (${placeholders})`,
+      normalizedIds
+    )
+    const deleted = Number(result?.changes ?? result?.affectedRows ?? 0)
+
+    res.json({ ok: true, deleted })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
 router.post('/', permissionRequired('tb_order:manage'), async (req, res) => {
   try {
     const payload = normalizePayload(req.body || {})

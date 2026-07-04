@@ -22,6 +22,10 @@ export function deleteTbOrder(id) {
   return request.delete(`/tb-orders/${id}`)
 }
 
+export function batchDeleteTbOrders(ids) {
+  return request.post('/tb-orders/batch-delete', { ids })
+}
+
 export function importTbOrders(items) {
   return request.post('/tb-orders/import', { items })
 }

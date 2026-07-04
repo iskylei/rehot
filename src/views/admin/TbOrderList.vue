@@ -32,13 +32,31 @@
           </el-form-item>
         </el-form>
         <div class="toolbar-actions" v-if="canManage">
+          <el-button
+            type="danger"
+            plain
+            icon="el-icon-delete"
+            :disabled="!selectedRows.length"
+            @click="handleBatchDelete"
+          >
+            批量删除{{ selectedRows.length ? ` (${selectedRows.length})` : '' }}
+          </el-button>
           <el-button type="primary" plain icon="el-icon-upload2" @click="openImport">导入</el-button>
           <el-button type="danger" icon="el-icon-plus" @click="openCreate">新增订单</el-button>
         </div>
       </div>
 
-      <el-table v-loading="loading" :data="items" stripe border size="small">
-        <el-table-column prop="bizOrderId" label="淘宝子编号" min-width="150" fixed="left" />
+      <el-table
+        ref="orderTable"
+        v-loading="loading"
+        :data="items"
+        stripe
+        border
+        size="small"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column v-if="canManage" type="selection" width="46" fixed="left" />
+        <el-table-column prop="bizOrderId" label="淘宝子编号" min-width="150" :fixed="canManage ? false : 'left'" />
         <el-table-column prop="parentOrderId" label="淘宝主编号" min-width="140" show-overflow-tooltip />
         <el-table-column prop="itemTitle" label="商品名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="sellerNick" label="服务商昵称" width="110" show-overflow-tooltip />
@@ -166,6 +184,7 @@ import {
   createTbOrder,
   updateTbOrder,
   deleteTbOrder,
+  batchDeleteTbOrders,
   importTbOrders,
   downloadTbOrderTemplate
 } from '@/api/tbOrders'
@@ -243,7 +262,8 @@ export default {
         bizOrderId: [{ required: true, message: '请输入淘宝子编号', trigger: 'blur' }]
       },
       importRows: [],
-      importPreview: []
+      importPreview: [],
+      selectedRows: []
     }
   },
   computed: {
@@ -277,11 +297,23 @@ export default {
         const res = await fetchTbOrders(this.buildQueryParams())
         this.items = res.items || []
         this.pagination.total = res.total || 0
+        if (!this.items.length && this.pagination.page > 1) {
+          this.pagination.page -= 1
+          return this.loadList()
+        }
+        this.clearSelection()
       } catch (error) {
         this.$message.error(error.message)
       } finally {
         this.loading = false
       }
+    },
+    handleSelectionChange(rows) {
+      this.selectedRows = rows || []
+    },
+    clearSelection() {
+      this.selectedRows = []
+      this.$refs.orderTable && this.$refs.orderTable.clearSelection()
     },
     handleSearch() {
       this.pagination.page = 1
@@ -363,6 +395,18 @@ export default {
         .then(async () => {
           await deleteTbOrder(row.id)
           this.$message.success('删除成功')
+          this.loadList()
+        })
+        .catch(() => {})
+    },
+    handleBatchDelete() {
+      if (!this.selectedRows.length) return
+      const count = this.selectedRows.length
+      this.$confirm(`确定删除选中的 ${count} 条订单吗？此操作不可恢复。`, '批量删除', { type: 'warning' })
+        .then(async () => {
+          const ids = this.selectedRows.map(row => row.id)
+          const res = await batchDeleteTbOrders(ids)
+          this.$message.success(`已删除 ${res.deleted ?? count} 条订单`)
           this.loadList()
         })
         .catch(() => {})
