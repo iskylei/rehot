@@ -69,7 +69,7 @@ async function fetchRowsPaged(filters = {}, page = 1, pageSize = 20) {
   const table = orderStore.getOrdersTableRef()
   const { sql, params } = buildWhereClause(filters)
   const pageNum = Math.max(1, Number(page) || 1)
-  const sizeNum = Math.min(100, Math.max(1, Number(pageSize) || 20))
+  const sizeNum = Math.min(500, Math.max(1, Number(pageSize) || 20))
   const offset = (pageNum - 1) * sizeNum
 
   const totalRow = await orderStore.queryOne(

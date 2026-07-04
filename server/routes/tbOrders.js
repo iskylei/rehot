@@ -107,7 +107,7 @@ router.get('/', async (req, res) => {
     } = req.query
 
     const pageNum = Math.max(1, Number(page) || 1)
-    const sizeNum = Math.min(100, Math.max(1, Number(pageSize) || 20))
+    const sizeNum = Math.min(500, Math.max(1, Number(pageSize) || 20))
     const offset = (pageNum - 1) * sizeNum
     const table = orderStore.getOrdersTableRef()
 
