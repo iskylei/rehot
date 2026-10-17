@@ -1,8 +1,8 @@
 const ORG_PERMISSION_PREFIX = 'org:view:'
 
 const DEFAULT_ORG_OVERVIEWS = [
-  { org: '联奇文化', title: '联奇文化数据', sortOrder: 3 },
-  { org: '柳风文化', title: '柳风文化数据', sortOrder: 4 }
+  { org: '联奇文化', title: '联奇文化数据', sortOrder: 4 },
+  { org: '柳风文化', title: '柳风文化数据', sortOrder: 5 }
 ]
 
 function buildOrgPermissionCode(orgName) {

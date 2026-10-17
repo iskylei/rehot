@@ -244,6 +244,33 @@ async function seedTbOrderMenu() {
   }
 }
 
+async function seedTbOrderDuplicateMenu() {
+  const existing = await appStore.queryOne("SELECT id FROM menus WHERE path = '/admin/tb-order-duplicates'")
+  if (existing) {
+    await appStore.execute(`
+      UPDATE menus
+      SET title = '重复订单查询',
+          icon = 'el-icon-copy-document',
+          permission_code = 'tb_order:view',
+          sort_order = 3,
+          enabled = 1
+      WHERE path = '/admin/tb-order-duplicates'
+    `)
+    return
+  }
+
+  const business = await appStore.queryOne(`
+    SELECT id FROM menus WHERE title = '业务管理' AND parent_id = 0 LIMIT 1
+  `)
+  if (!business) return
+
+  await appStore.execute(
+    `INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
+     VALUES (?, '重复订单查询', '/admin/tb-order-duplicates', 'el-icon-copy-document', 'tb_order:view', 3, 1)`,
+    [business.id]
+  )
+}
+
 async function migrateOrgOverviewMenus() {
   const { DEFAULT_ORG_OVERVIEWS } = require('../constants/orgPermissions')
   const { ensureOrgPermission } = require('../services/orgPermissionService')
@@ -263,7 +290,7 @@ async function migrateOrgOverviewMenus() {
         path = '/admin/org-overview?org=联奇文化',
         icon = 'el-icon-data-line',
         permission_code = 'org:view:联奇文化',
-        sort_order = 3,
+        sort_order = 4,
         enabled = 1
     WHERE path = '/admin/dev-lianqi-overview'
   `)
@@ -379,6 +406,7 @@ async function seedMysqlApp() {
   await seedRoles()
   await seedMenus()
   await seedTbOrderMenu()
+  await seedTbOrderDuplicateMenu()
   await migrateOrgOverviewMenus()
   await seedLoginConfigMenu()
   await seedUsers()

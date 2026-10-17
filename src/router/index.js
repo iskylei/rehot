@@ -59,6 +59,12 @@ const routes = [
         meta: { requiresAuth: true, title: '直播订单管理', permission: 'tb_order:view' }
       },
       {
+        path: 'tb-order-duplicates',
+        name: 'TbOrderDuplicates',
+        component: () => import('../views/admin/TbOrderDuplicates.vue'),
+        meta: { requiresAuth: true, title: '重复订单查询', permission: 'tb_order:view' }
+      },
+      {
         path: 'users',
         name: 'UserList',
         component: () => import('../views/admin/UserList.vue'),

@@ -7,6 +7,7 @@ export const VALID_ADMIN_PATHS = [
   '/admin/live-overview',
   '/admin/org-overview',
   '/admin/tb-orders',
+  '/admin/tb-order-duplicates',
   '/admin/users',
   '/admin/roles',
   '/admin/menus',

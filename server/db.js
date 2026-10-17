@@ -303,6 +303,32 @@ function seedTbOrderMenu() {
   })
 }
 
+function seedTbOrderDuplicateMenu() {
+  const existing = db.prepare("SELECT id FROM menus WHERE path = '/admin/tb-order-duplicates'").get()
+  if (existing) {
+    db.prepare(`
+      UPDATE menus
+      SET title = '重复订单查询',
+          icon = 'el-icon-copy-document',
+          permission_code = 'tb_order:view',
+          sort_order = 3,
+          enabled = 1
+      WHERE path = '/admin/tb-order-duplicates'
+    `).run()
+    return
+  }
+
+  const business = db.prepare(`
+    SELECT id FROM menus WHERE title = '业务管理' AND parent_id = 0 LIMIT 1
+  `).get()
+  if (!business) return
+
+  db.prepare(`
+    INSERT INTO menus (parent_id, title, path, icon, permission_code, sort_order, enabled)
+    VALUES (?, '重复订单查询', '/admin/tb-order-duplicates', 'el-icon-copy-document', 'tb_order:view', 3, 1)
+  `).run(business.id)
+}
+
 function migrateOrgOverviewMenus() {
   const { DEFAULT_ORG_OVERVIEWS } = require('./constants/orgPermissions')
 
@@ -343,7 +369,7 @@ function migrateOrgOverviewMenus() {
         path = '/admin/org-overview?org=联奇文化',
         icon = 'el-icon-data-line',
         permission_code = 'org:view:联奇文化',
-        sort_order = 3,
+        sort_order = 4,
         enabled = 1
     WHERE path = '/admin/dev-lianqi-overview'
   `).run()
@@ -625,6 +651,7 @@ function initDb() {
   seedRoles()
   seedMenus()
   seedTbOrderMenu()
+  seedTbOrderDuplicateMenu()
   migrateOrgOverviewMenus()
   seedLoginConfigMenu()
   seedUsers()

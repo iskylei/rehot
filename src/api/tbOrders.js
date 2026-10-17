@@ -6,6 +6,10 @@ export function fetchTbOrders(params) {
   return request.get('/tb-orders', { params })
 }
 
+export function fetchTbOrderDuplicates(params) {
+  return request.get('/tb-orders/duplicates', { params })
+}
+
 export function fetchTbOrder(id) {
   return request.get(`/tb-orders/${id}`)
 }

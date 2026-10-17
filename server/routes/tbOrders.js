@@ -158,9 +158,110 @@ router.get('/', async (req, res) => {
   }
 })
 
+const DUPLICATE_GROUP_FIELDS = {
+  bizOrderId: 'biz_order_id',
+  parentOrderId: 'parent_order_id'
+}
+
+router.get('/duplicates', async (req, res) => {
+  try {
+    const {
+      groupBy = 'bizOrderId',
+      startDate = '',
+      endDate = '',
+      page = '1',
+      pageSize = '20'
+    } = req.query
+
+    const groupColumn = DUPLICATE_GROUP_FIELDS[groupBy]
+    if (!groupColumn) {
+      return res.status(400).json({ message: '不支持的重复依据，请使用淘宝子编号或淘宝主编号' })
+    }
+
+    const pageNum = Math.max(1, Number(page) || 1)
+    const sizeNum = Math.min(500, Math.max(1, Number(pageSize) || 20))
+    const offset = (pageNum - 1) * sizeNum
+    const table = orderStore.getOrdersTableRef()
+    const trimmed = orderStore.trimExpr(groupColumn)
+
+    let where = `WHERE ${trimmed} != ''`
+    const params = []
+
+    if (startDate) {
+      where += ' AND order_paid_time >= ?'
+      params.push(startDate)
+    }
+
+    if (endDate) {
+      where += ' AND order_paid_time <= ?'
+      params.push(endDate.includes(':') ? endDate : `${endDate} 23:59:59`)
+    }
+
+    const summary = await orderStore.queryOne(`
+      SELECT COUNT(*) AS groups, COALESCE(SUM(dup_count), 0) AS rows
+      FROM (
+        SELECT COUNT(*) AS dup_count
+        FROM ${table}
+        ${where}
+        GROUP BY ${trimmed}
+        HAVING COUNT(*) > 1
+      ) duplicate_groups
+    `, params)
+
+    const groupRows = await orderStore.queryAll(`
+      SELECT ${trimmed} AS dup_key, COUNT(*) AS dup_count
+      FROM ${table}
+      ${where}
+      GROUP BY ${trimmed}
+      HAVING COUNT(*) > 1
+      ORDER BY dup_count DESC, ${trimmed} ASC
+      LIMIT ? OFFSET ?
+    `, [...params, sizeNum, offset])
+
+    const keys = groupRows
+      .map(row => row.dup_key)
+      .filter(key => key !== undefined && key !== null && String(key).trim() !== '')
+    let ordersByKey = {}
+
+    if (keys.length) {
+      const placeholders = keys.map(() => '?').join(', ')
+      const orderRows = await orderStore.queryAll(`
+        SELECT * FROM ${table}
+        ${where}
+        AND ${trimmed} IN (${placeholders})
+        ORDER BY ${trimmed} ASC, id ASC
+      `, [...params, ...keys])
+
+      ordersByKey = orderRows.reduce((acc, row) => {
+        const key = String(row[groupColumn] || '').trim()
+        if (!acc[key]) acc[key] = []
+        acc[key].push(mapSysTbOrder(row))
+        return acc
+      }, {})
+    }
+
+    res.json({
+      groupBy,
+      items: groupRows.map(row => ({
+        key: row.dup_key,
+        count: Number(row.dup_count) || 0,
+        orders: ordersByKey[row.dup_key] || []
+      })),
+      total: Number(summary?.groups) || 0,
+      totalRows: Number(summary?.rows) || 0,
+      page: pageNum,
+      pageSize: sizeNum
+    })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
 router.get('/:id', async (req, res) => {
   try {
-    if (req.params.id === 'import') return res.status(404).json({ message: '记录不存在' })
+    if (req.params.id === 'import' || req.params.id === 'duplicates') {
+      return res.status(404).json({ message: '记录不存在' })
+    }
     const table = orderStore.getOrdersTableRef()
     const row = await orderStore.queryOne(`SELECT * FROM ${table} WHERE id = ?`, [req.params.id])
     if (!row) {
