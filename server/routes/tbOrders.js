@@ -163,39 +163,76 @@ const DUPLICATE_GROUP_FIELDS = {
   parentOrderId: 'parent_order_id'
 }
 
+function buildDuplicateScope(filters = {}) {
+  const groupBy = filters.groupBy || 'bizOrderId'
+  const groupColumn = DUPLICATE_GROUP_FIELDS[groupBy]
+  if (!groupColumn) {
+    return { error: '不支持的重复依据，请使用淘宝子编号或淘宝主编号' }
+  }
+
+  const table = orderStore.getOrdersTableRef()
+  const trimmed = orderStore.trimExpr(groupColumn)
+  const agencyTrimmed = orderStore.trimExpr('agency_nick')
+  let where = `WHERE ${trimmed} != ''`
+  const params = []
+
+  const startDate = String(filters.startDate || '').trim()
+  const endDate = String(filters.endDate || '').trim()
+  const agencyNick = String(filters.agencyNick || '').trim()
+
+  if (startDate) {
+    where += ' AND order_paid_time >= ?'
+    params.push(startDate)
+  }
+
+  if (endDate) {
+    where += ' AND order_paid_time <= ?'
+    params.push(endDate.includes(':') ? endDate : `${endDate} 23:59:59`)
+  }
+
+  if (agencyNick) {
+    where += ` AND ${agencyTrimmed} LIKE ?`
+    params.push(`%${agencyNick}%`)
+  }
+
+  return { groupBy, groupColumn, table, trimmed, where, params }
+}
+
+async function deleteByIds(table, ids) {
+  let deleted = 0
+  const chunkSize = 500
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize)
+    const placeholders = chunk.map(() => '?').join(', ')
+    const result = await orderStore.execute(
+      `DELETE FROM ${table} WHERE id IN (${placeholders})`,
+      chunk
+    )
+    deleted += Number(result?.changes ?? result?.affectedRows ?? 0)
+  }
+  return deleted
+}
+
 router.get('/duplicates', async (req, res) => {
   try {
     const {
       groupBy = 'bizOrderId',
       startDate = '',
       endDate = '',
+      agencyNick = '',
       page = '1',
       pageSize = '20'
     } = req.query
 
-    const groupColumn = DUPLICATE_GROUP_FIELDS[groupBy]
-    if (!groupColumn) {
-      return res.status(400).json({ message: '不支持的重复依据，请使用淘宝子编号或淘宝主编号' })
+    const scope = buildDuplicateScope({ groupBy, startDate, endDate, agencyNick })
+    if (scope.error) {
+      return res.status(400).json({ message: scope.error })
     }
 
     const pageNum = Math.max(1, Number(page) || 1)
     const sizeNum = Math.min(500, Math.max(1, Number(pageSize) || 20))
     const offset = (pageNum - 1) * sizeNum
-    const table = orderStore.getOrdersTableRef()
-    const trimmed = orderStore.trimExpr(groupColumn)
-
-    let where = `WHERE ${trimmed} != ''`
-    const params = []
-
-    if (startDate) {
-      where += ' AND order_paid_time >= ?'
-      params.push(startDate)
-    }
-
-    if (endDate) {
-      where += ' AND order_paid_time <= ?'
-      params.push(endDate.includes(':') ? endDate : `${endDate} 23:59:59`)
-    }
+    const { table, trimmed, where, params } = scope
 
     const summary = await orderStore.queryOne(`
       SELECT COUNT(*) AS group_count, COALESCE(SUM(dup_count), 0) AS row_count
@@ -252,6 +289,68 @@ router.get('/duplicates', async (req, res) => {
       page: pageNum,
       pageSize: sizeNum
     })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
+router.post('/duplicates/batch-delete', permissionRequired('tb_order:manage'), async (req, res) => {
+  try {
+    const {
+      groupBy = 'bizOrderId',
+      keys = [],
+      startDate = '',
+      endDate = '',
+      agencyNick = ''
+    } = req.body || {}
+
+    if (!Array.isArray(keys) || !keys.length) {
+      return res.status(400).json({ message: '请选择要清理的重复分组' })
+    }
+
+    const normalizedKeys = [...new Set(
+      keys.map(key => String(key || '').trim()).filter(Boolean)
+    )]
+    if (!normalizedKeys.length) {
+      return res.status(400).json({ message: '无效的重复分组' })
+    }
+    if (normalizedKeys.length > 500) {
+      return res.status(400).json({ message: '单次最多清理 500 组重复订单' })
+    }
+
+    const scope = buildDuplicateScope({ groupBy, startDate, endDate, agencyNick })
+    if (scope.error) {
+      return res.status(400).json({ message: scope.error })
+    }
+
+    const { table, trimmed, where, params } = scope
+    const placeholders = normalizedKeys.map(() => '?').join(', ')
+    const rows = await orderStore.queryAll(`
+      SELECT id, ${trimmed} AS dup_key
+      FROM ${table}
+      ${where}
+      AND ${trimmed} IN (${placeholders})
+      ORDER BY id ASC
+    `, [...params, ...normalizedKeys])
+
+    const seenKeys = new Set()
+    const deleteIds = []
+    rows.forEach(row => {
+      const key = String(row.dup_key || '').trim()
+      if (!key) return
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key)
+        return
+      }
+      deleteIds.push(row.id)
+    })
+
+    if (!deleteIds.length) {
+      return res.json({ ok: true, deleted: 0, kept: seenKeys.size })
+    }
+
+    const deleted = await deleteByIds(table, deleteIds)
+    res.json({ ok: true, deleted, kept: seenKeys.size })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

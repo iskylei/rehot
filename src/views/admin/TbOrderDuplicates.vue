@@ -9,6 +9,15 @@
               <el-option label="淘宝主编号" value="parentOrderId" />
             </el-select>
           </el-form-item>
+          <el-form-item label="机构昵称">
+            <el-input
+              v-model="filters.agencyNick"
+              placeholder="机构昵称"
+              clearable
+              style="width: 160px"
+              @keyup.enter.native="handleSearch"
+            />
+          </el-form-item>
           <el-form-item label="支付日期">
             <el-date-picker
               v-model="filters.dateRange"
@@ -26,20 +35,42 @@
             <el-button @click="resetFilters">重置</el-button>
           </el-form-item>
         </el-form>
+        <div class="toolbar-actions" v-if="canManage">
+          <el-button
+            type="danger"
+            plain
+            icon="el-icon-delete"
+            :disabled="!selectedGroups.length"
+            :loading="deleting"
+            @click="handleBatchDelete"
+          >
+            批量删除重复{{ selectedGroups.length ? ` (${selectedGroups.length} 组)` : '' }}
+          </el-button>
+        </div>
       </div>
 
       <div class="duplicate-summary">
         共 {{ pagination.total }} 组重复，涉及 {{ totalRows }} 条订单。
-        默认按全部日期查询；可按支付日期缩小范围。
+        批量删除会保留每组 ID 最小的 1 条，删除其余重复记录。
       </div>
 
-      <el-table v-loading="loading" :data="groups" stripe border size="small">
+      <el-table
+        ref="groupTable"
+        v-loading="loading"
+        :data="groups"
+        stripe
+        border
+        size="small"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column v-if="canManage" type="selection" width="46" />
         <el-table-column type="expand">
           <template slot-scope="{ row }">
             <el-table :data="row.orders" border size="mini">
               <el-table-column prop="id" label="ID" width="70" />
               <el-table-column prop="bizOrderId" label="淘宝子编号" min-width="150" show-overflow-tooltip />
               <el-table-column prop="parentOrderId" label="淘宝主编号" min-width="140" show-overflow-tooltip />
+              <el-table-column prop="agencyNick" label="机构昵称" min-width="120" show-overflow-tooltip />
               <el-table-column prop="itemTitle" label="商品名称" min-width="160" show-overflow-tooltip />
               <el-table-column prop="orderStatus" label="订单状态" width="110" />
               <el-table-column prop="orderPaidTime" label="支付日期" width="160" />
@@ -55,6 +86,9 @@
         </el-table-column>
         <el-table-column prop="key" :label="keyLabel" min-width="180" show-overflow-tooltip />
         <el-table-column prop="count" label="重复条数" width="100" />
+        <el-table-column label="机构昵称" min-width="120" show-overflow-tooltip>
+          <template slot-scope="{ row }">{{ (row.orders[0] && row.orders[0].agencyNick) || '-' }}</template>
+        </el-table-column>
         <el-table-column label="商品名称" min-width="180" show-overflow-tooltip>
           <template slot-scope="{ row }">{{ (row.orders[0] && row.orders[0].itemTitle) || '-' }}</template>
         </el-table-column>
@@ -80,11 +114,12 @@
 </template>
 
 <script>
-import { fetchTbOrderDuplicates, deleteTbOrder } from '@/api/tbOrders'
+import { fetchTbOrderDuplicates, deleteTbOrder, batchDeleteDuplicateTbOrders } from '@/api/tbOrders'
 import { hasPermission } from '@/utils/auth'
 
 const emptyFilters = () => ({
   groupBy: 'bizOrderId',
+  agencyNick: '',
   dateRange: []
 })
 
@@ -93,7 +128,9 @@ export default {
   data() {
     return {
       loading: false,
+      deleting: false,
       groups: [],
+      selectedGroups: [],
       totalRows: 0,
       filters: emptyFilters(),
       pagination: {
@@ -118,6 +155,7 @@ export default {
     buildQueryParams() {
       const params = {
         groupBy: this.filters.groupBy,
+        agencyNick: this.filters.agencyNick,
         page: this.pagination.page,
         pageSize: this.pagination.pageSize
       }
@@ -138,11 +176,19 @@ export default {
           this.pagination.page -= 1
           return this.loadList()
         }
+        this.clearSelection()
       } catch (error) {
         this.$message.error(error.message || '查询重复订单失败')
       } finally {
         this.loading = false
       }
+    },
+    handleSelectionChange(rows) {
+      this.selectedGroups = rows || []
+    },
+    clearSelection() {
+      this.selectedGroups = []
+      this.$refs.groupTable && this.$refs.groupTable.clearSelection()
     },
     handleSearch() {
       this.pagination.page = 1
@@ -170,6 +216,38 @@ export default {
           this.loadList()
         })
         .catch(() => {})
+    },
+    handleBatchDelete() {
+      if (!this.selectedGroups.length) return
+      const groupCount = this.selectedGroups.length
+      const extraCount = this.selectedGroups.reduce((sum, group) => {
+        return sum + Math.max((Number(group.count) || 0) - 1, 0)
+      }, 0)
+      this.$confirm(
+        `已选 ${groupCount} 组，将保留每组 ID 最小的 1 条，删除其余约 ${extraCount} 条重复订单。此操作不可恢复。`,
+        '批量删除重复',
+        { type: 'warning' }
+      )
+        .then(async () => {
+          this.deleting = true
+          try {
+            const params = this.buildQueryParams()
+            const res = await batchDeleteDuplicateTbOrders({
+              groupBy: params.groupBy,
+              agencyNick: params.agencyNick,
+              startDate: params.startDate,
+              endDate: params.endDate,
+              keys: this.selectedGroups.map(group => group.key)
+            })
+            this.$message.success(`已删除 ${res.deleted || 0} 条重复订单，保留 ${res.kept || 0} 条`)
+            this.loadList()
+          } catch (error) {
+            this.$message.error(error.message || '批量删除失败')
+          } finally {
+            this.deleting = false
+          }
+        })
+        .catch(() => {})
     }
   }
 }
@@ -183,6 +261,11 @@ export default {
   margin-bottom: 12px;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .duplicate-summary {

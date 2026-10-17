@@ -30,6 +30,10 @@ export function batchDeleteTbOrders(ids) {
   return request.post('/tb-orders/batch-delete', { ids })
 }
 
+export function batchDeleteDuplicateTbOrders(data) {
+  return request.post('/tb-orders/duplicates/batch-delete', data, { timeout: 120000 })
+}
+
 export function importTbOrders(items) {
   return request.post('/tb-orders/import', { items })
 }
