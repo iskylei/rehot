@@ -51,7 +51,7 @@
 
       <div class="duplicate-summary">
         共 {{ pagination.total }} 组重复，涉及 {{ totalRows }} 条订单。
-        批量删除会保留每组 ID 最小的 1 条，删除其余重复记录。
+        批量删除规则：组内存在「订单取消」则整组删除；否则保留 ID 最小的 1 条。
       </div>
 
       <el-table
@@ -220,11 +220,8 @@ export default {
     handleBatchDelete() {
       if (!this.selectedGroups.length) return
       const groupCount = this.selectedGroups.length
-      const extraCount = this.selectedGroups.reduce((sum, group) => {
-        return sum + Math.max((Number(group.count) || 0) - 1, 0)
-      }, 0)
       this.$confirm(
-        `已选 ${groupCount} 组，将保留每组 ID 最小的 1 条，删除其余约 ${extraCount} 条重复订单。此操作不可恢复。`,
+        `已选 ${groupCount} 组。组内存在「订单取消」将整组删除；否则保留 ID 最小的 1 条，删除其余重复订单。此操作不可恢复。`,
         '批量删除重复',
         { type: 'warning' }
       )
@@ -239,7 +236,9 @@ export default {
               endDate: params.endDate,
               keys: this.selectedGroups.map(group => group.key)
             })
-            this.$message.success(`已删除 ${res.deleted || 0} 条重复订单，保留 ${res.kept || 0} 条`)
+            const cleared = res.clearedGroups || 0
+            const extra = cleared ? `，其中 ${cleared} 组因含取消订单已整组删除` : ''
+            this.$message.success(`已删除 ${res.deleted || 0} 条重复订单，保留 ${res.kept || 0} 条${extra}`)
             this.loadList()
           } catch (error) {
             this.$message.error(error.message || '批量删除失败')

@@ -198,6 +198,10 @@ function buildDuplicateScope(filters = {}) {
   return { groupBy, groupColumn, table, trimmed, where, params }
 }
 
+function isCancelledOrderStatus(status) {
+  return String(status || '').includes('取消')
+}
+
 async function deleteByIds(table, ids) {
   let deleted = 0
   const chunkSize = 500
@@ -326,31 +330,41 @@ router.post('/duplicates/batch-delete', permissionRequired('tb_order:manage'), a
     const { table, trimmed, where, params } = scope
     const placeholders = normalizedKeys.map(() => '?').join(', ')
     const rows = await orderStore.queryAll(`
-      SELECT id, ${trimmed} AS dup_key
+      SELECT id, ${trimmed} AS dup_key, order_status
       FROM ${table}
       ${where}
       AND ${trimmed} IN (${placeholders})
       ORDER BY id ASC
     `, [...params, ...normalizedKeys])
 
-    const seenKeys = new Set()
-    const deleteIds = []
+    const grouped = new Map()
     rows.forEach(row => {
       const key = String(row.dup_key || '').trim()
       if (!key) return
-      if (!seenKeys.has(key)) {
-        seenKeys.add(key)
+      if (!grouped.has(key)) grouped.set(key, [])
+      grouped.get(key).push(row)
+    })
+
+    const deleteIds = []
+    let kept = 0
+    let clearedGroups = 0
+    grouped.forEach(items => {
+      const hasCancelled = items.some(item => isCancelledOrderStatus(item.order_status))
+      if (hasCancelled) {
+        items.forEach(item => deleteIds.push(item.id))
+        clearedGroups += 1
         return
       }
-      deleteIds.push(row.id)
+      kept += 1
+      items.slice(1).forEach(item => deleteIds.push(item.id))
     })
 
     if (!deleteIds.length) {
-      return res.json({ ok: true, deleted: 0, kept: seenKeys.size })
+      return res.json({ ok: true, deleted: 0, kept, clearedGroups })
     }
 
     const deleted = await deleteByIds(table, deleteIds)
-    res.json({ ok: true, deleted, kept: seenKeys.size })
+    res.json({ ok: true, deleted, kept, clearedGroups })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
