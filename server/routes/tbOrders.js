@@ -198,7 +198,7 @@ router.get('/duplicates', async (req, res) => {
     }
 
     const summary = await orderStore.queryOne(`
-      SELECT COUNT(*) AS groups, COALESCE(SUM(dup_count), 0) AS rows
+      SELECT COUNT(*) AS group_count, COALESCE(SUM(dup_count), 0) AS row_count
       FROM (
         SELECT COUNT(*) AS dup_count
         FROM ${table}
@@ -247,8 +247,8 @@ router.get('/duplicates', async (req, res) => {
         count: Number(row.dup_count) || 0,
         orders: ordersByKey[row.dup_key] || []
       })),
-      total: Number(summary?.groups) || 0,
-      totalRows: Number(summary?.rows) || 0,
+      total: Number(summary?.group_count) || 0,
+      totalRows: Number(summary?.row_count) || 0,
       page: pageNum,
       pageSize: sizeNum
     })
