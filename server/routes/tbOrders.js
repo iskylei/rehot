@@ -232,7 +232,7 @@ router.get('/duplicates', async (req, res) => {
     const pageNum = Math.max(1, Number(page) || 1)
     const sizeNum = Math.min(500, Math.max(1, Number(pageSize) || 20))
     const offset = (pageNum - 1) * sizeNum
-    const { table, trimmed, where, params } = scope
+    const { groupColumn, table, trimmed, where, params } = scope
 
     const summary = await orderStore.queryOne(`
       SELECT COUNT(*) AS group_count, COALESCE(SUM(dup_count), 0) AS row_count
