@@ -56,20 +56,32 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column v-if="canManage" type="selection" width="46" fixed="left" />
-        <el-table-column prop="bizOrderId" label="淘宝子编号" min-width="150" :fixed="canManage ? false : 'left'" />
-        <el-table-column prop="parentOrderId" label="淘宝主编号" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="itemTitle" label="商品名称" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="sellerNick" label="服务商昵称" width="110" show-overflow-tooltip />
-        <el-table-column prop="adUserNick" label="达人昵称" width="100" show-overflow-tooltip />
-        <el-table-column prop="agencyNick" label="机构昵称" width="110" show-overflow-tooltip />
-        <el-table-column prop="orderStatus" label="订单状态" width="100" />
-        <el-table-column prop="orderPaidTime" label="支付日期" width="150" />
-        <el-table-column prop="orderAmount" label="支付金额" width="90" />
-        <el-table-column prop="predictAmount" label="预估佣金" width="90" />
-        <el-table-column prop="buyAmount" label="数量" width="70">
+        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column prop="bizOrderId" label="淘宝子编号" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="parentOrderId" label="淘宝主编号" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="sellerNick" label="服务商昵称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="itemTitle" label="商品名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="itemId" label="商品编号" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="adUserNick" label="达人昵称" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="agencyNick" label="机构昵称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="orderStatus" label="订单状态" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="orderPaidTime" label="支付日期" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="orderAmount" label="支付金额" width="100" />
+        <el-table-column prop="predictAmount" label="预估佣金收入" width="120" />
+        <el-table-column prop="orderCommissionAmount" label="成交金额" width="100" />
+        <el-table-column prop="sellerCommissionRatio" label="佣金比例" width="100" />
+        <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="refundAmount" label="退款金额" width="100" />
+        <el-table-column prop="predictTotalAmount" label="预测总金额" width="110" />
+        <el-table-column prop="buyAmount" label="购买数量" width="90">
           <template slot-scope="{ row }">{{ row.buyAmount ?? '-' }}</template>
         </el-table-column>
-        <el-table-column prop="loginUserName" label="机构名称" width="110" show-overflow-tooltip />
+        <el-table-column prop="loginUserName" label="机构名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="userFlow" label="流量" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="createBy" label="创建人" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="createTime" label="创建时间" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="updateBy" label="更新人" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="updateTime" label="更新时间" min-width="160" show-overflow-tooltip />
         <el-table-column v-if="canManage" label="操作" width="130" fixed="right">
           <template slot-scope="{ row }">
             <el-button type="text" @click="openEdit(row)">编辑</el-button>
