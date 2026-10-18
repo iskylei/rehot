@@ -117,10 +117,19 @@
 import { fetchTbOrderDuplicates, deleteTbOrder, batchDeleteDuplicateTbOrders } from '@/api/tbOrders'
 import { hasPermission } from '@/utils/auth'
 
+function getDefaultDateRange() {
+  const today = new Date()
+  const yyyy = today.getFullYear()
+  const mm = String(today.getMonth() + 1).padStart(2, '0')
+  const dd = String(today.getDate()).padStart(2, '0')
+  const day = `${yyyy}-${mm}-${dd}`
+  return [day, day]
+}
+
 const emptyFilters = () => ({
   groupBy: 'bizOrderId',
   agencyNick: '',
-  dateRange: []
+  dateRange: getDefaultDateRange()
 })
 
 export default {
