@@ -172,13 +172,13 @@ function buildDuplicateScope(filters = {}) {
 
   const table = orderStore.getOrdersTableRef()
   const trimmed = orderStore.trimExpr(groupColumn)
-  const agencyTrimmed = orderStore.trimExpr('agency_nick')
+  const loginUserTrimmed = orderStore.trimExpr('login_user_name')
   let where = `WHERE ${trimmed} != ''`
   const params = []
 
   const startDate = String(filters.startDate || '').trim()
   const endDate = String(filters.endDate || '').trim()
-  const agencyNick = String(filters.agencyNick || '').trim()
+  const loginUserName = String(filters.loginUserName || '').trim()
 
   if (startDate) {
     where += ' AND order_paid_time >= ?'
@@ -190,9 +190,9 @@ function buildDuplicateScope(filters = {}) {
     params.push(endDate.includes(':') ? endDate : `${endDate} 23:59:59`)
   }
 
-  if (agencyNick) {
-    where += ` AND ${agencyTrimmed} LIKE ?`
-    params.push(`%${agencyNick}%`)
+  if (loginUserName) {
+    where += ` AND ${loginUserTrimmed} LIKE ?`
+    params.push(`%${loginUserName}%`)
   }
 
   return { groupBy, groupColumn, table, trimmed, where, params }
@@ -223,12 +223,12 @@ router.get('/duplicates', async (req, res) => {
       groupBy = 'bizOrderId',
       startDate = '',
       endDate = '',
-      agencyNick = '',
+      loginUserName = '',
       page = '1',
       pageSize = '20'
     } = req.query
 
-    const scope = buildDuplicateScope({ groupBy, startDate, endDate, agencyNick })
+    const scope = buildDuplicateScope({ groupBy, startDate, endDate, loginUserName })
     if (scope.error) {
       return res.status(400).json({ message: scope.error })
     }
@@ -305,7 +305,7 @@ router.post('/duplicates/batch-delete', permissionRequired('tb_order:manage'), a
       keys = [],
       startDate = '',
       endDate = '',
-      agencyNick = ''
+      loginUserName = ''
     } = req.body || {}
 
     if (!Array.isArray(keys) || !keys.length) {
@@ -322,7 +322,7 @@ router.post('/duplicates/batch-delete', permissionRequired('tb_order:manage'), a
       return res.status(400).json({ message: '单次最多清理 500 组重复订单' })
     }
 
-    const scope = buildDuplicateScope({ groupBy, startDate, endDate, agencyNick })
+    const scope = buildDuplicateScope({ groupBy, startDate, endDate, loginUserName })
     if (scope.error) {
       return res.status(400).json({ message: scope.error })
     }

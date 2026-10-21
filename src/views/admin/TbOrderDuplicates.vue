@@ -9,10 +9,10 @@
               <el-option label="淘宝主编号" value="parentOrderId" />
             </el-select>
           </el-form-item>
-          <el-form-item label="机构昵称">
+          <el-form-item label="机构名称">
             <el-input
-              v-model="filters.agencyNick"
-              placeholder="机构昵称"
+              v-model="filters.loginUserName"
+              placeholder="机构名称"
               clearable
               style="width: 160px"
               @keyup.enter.native="handleSearch"
@@ -86,8 +86,8 @@
         </el-table-column>
         <el-table-column prop="key" :label="keyLabel" min-width="180" show-overflow-tooltip />
         <el-table-column prop="count" label="重复条数" width="100" />
-        <el-table-column label="机构昵称" min-width="120" show-overflow-tooltip>
-          <template slot-scope="{ row }">{{ (row.orders[0] && row.orders[0].agencyNick) || '-' }}</template>
+        <el-table-column label="机构名称" min-width="120" show-overflow-tooltip>
+          <template slot-scope="{ row }">{{ (row.orders[0] && row.orders[0].loginUserName) || '-' }}</template>
         </el-table-column>
         <el-table-column label="商品名称" min-width="180" show-overflow-tooltip>
           <template slot-scope="{ row }">{{ (row.orders[0] && row.orders[0].itemTitle) || '-' }}</template>
@@ -128,7 +128,7 @@ function getDefaultDateRange() {
 
 const emptyFilters = () => ({
   groupBy: 'bizOrderId',
-  agencyNick: '',
+  loginUserName: '',
   dateRange: getDefaultDateRange()
 })
 
@@ -164,7 +164,7 @@ export default {
     buildQueryParams() {
       const params = {
         groupBy: this.filters.groupBy,
-        agencyNick: this.filters.agencyNick,
+        loginUserName: this.filters.loginUserName,
         page: this.pagination.page,
         pageSize: this.pagination.pageSize
       }
@@ -240,7 +240,7 @@ export default {
             const params = this.buildQueryParams()
             const res = await batchDeleteDuplicateTbOrders({
               groupBy: params.groupBy,
-              agencyNick: params.agencyNick,
+              loginUserName: params.loginUserName,
               startDate: params.startDate,
               endDate: params.endDate,
               keys: this.selectedGroups.map(group => group.key)
